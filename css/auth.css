@@ -14,7 +14,6 @@
   --border: #dfe2e6;
   --input: #c8ccd1;
   --ring: #247a63;
-  --success: #176b51;
 }
 
 * {
@@ -171,16 +170,6 @@ input:focus-visible {
   color: var(--primary-foreground);
 }
 
-.auth-status {
-  margin: 20px 0 0;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--success);
-  font-size: 13px;
-  text-align: center;
-}
-
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -191,7 +180,8 @@ input:focus-visible {
   background: rgb(32 33 36 / 36%);
 }
 
-.error-dialog {
+.error-dialog,
+.signup-success-dialog {
   width: min(100%, 380px);
   padding: 24px;
   border: 1px solid var(--border);
@@ -201,14 +191,16 @@ input:focus-visible {
   box-shadow: 0 18px 48px rgb(32 33 36 / 24%);
 }
 
-.error-dialog p {
+.error-dialog p,
+.signup-success-dialog p {
   margin: 0 0 22px;
   color: var(--muted-foreground);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
-.error-dialog .btn {
+.error-dialog .btn,
+.signup-success-dialog .btn {
   width: 100%;
 }
 

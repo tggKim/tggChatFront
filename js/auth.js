@@ -11,19 +11,20 @@
   const showLoginButton = document.getElementById("show-login");
   const loginSubmitButton = document.getElementById("login-submit");
   const signupSubmitButton = document.getElementById("signup-submit");
-  const authStatus = document.getElementById("auth-status");
   const errorDialog = document.getElementById("error-dialog");
   const errorMessage = document.getElementById("error-message");
   const errorConfirmButton = document.getElementById("error-confirm");
+  const signupSuccessDialog = document.getElementById("signup-success-dialog");
+  const signupSuccessConfirmButton = document.getElementById("signup-success-confirm");
 
   let previouslyFocusedElement = null;
+  let pendingSignupEmail = "";
 
   const setView = (view) => {
     const showLogin = view === "login";
 
     loginForm.hidden = !showLogin;
     signupForm.hidden = showLogin;
-    authStatus.hidden = true;
     document.title = showLogin ? "TGG Chat | 로그인" : "TGG Chat | 회원가입";
 
     if (showLogin) {
@@ -55,6 +56,20 @@
     if (previouslyFocusedElement instanceof HTMLElement) {
       previouslyFocusedElement.focus();
     }
+  };
+
+  const showSignupSuccess = (email) => {
+    pendingSignupEmail = email;
+    signupSuccessDialog.hidden = false;
+    signupSuccessConfirmButton.focus();
+  };
+
+  const confirmSignupSuccess = () => {
+    signupSuccessDialog.hidden = true;
+    loginEmailInput.value = pendingSignupEmail;
+    pendingSignupEmail = "";
+    signupForm.reset();
+    setView("login");
   };
 
   const request = async (path, options) => {
@@ -136,12 +151,7 @@
         method: "POST",
         body: JSON.stringify(requestBody)
       });
-
-      loginEmailInput.value = requestBody.email;
-      signupForm.reset();
-      setView("login");
-      authStatus.textContent = "회원가입이 완료되었습니다.";
-      authStatus.hidden = false;
+      showSignupSuccess(requestBody.email);
     } catch (error) {
       showError(error.message);
     } finally {
@@ -150,6 +160,7 @@
   });
 
   errorConfirmButton.addEventListener("click", closeError);
+  signupSuccessConfirmButton.addEventListener("click", confirmSignupSuccess);
 
   errorDialog.addEventListener("click", (event) => {
     if (event.target === errorDialog) {

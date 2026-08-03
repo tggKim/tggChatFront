@@ -25,7 +25,8 @@
           <input
             id="login-email"
             name="email"
-            type="email"
+            type="text"
+            inputmode="email"
             autocomplete="email"
             maxlength="254"
             required
@@ -59,7 +60,8 @@
           <input
             id="signup-email"
             name="email"
-            type="email"
+            type="text"
+            inputmode="email"
             autocomplete="email"
             maxlength="254"
             required
@@ -94,8 +96,6 @@
           <button class="btn" type="button" id="show-login">로그인으로 돌아가기</button>
         </div>
       </form>
-
-      <p class="auth-status" id="auth-status" role="status" hidden></p>
     </section>
 
     <div class="dialog-backdrop" id="error-dialog" hidden>
@@ -108,6 +108,18 @@
       >
         <p id="error-message"></p>
         <button class="btn btn-primary" type="button" id="error-confirm">확인</button>
+      </section>
+    </div>
+    <div class="dialog-backdrop" id="signup-success-dialog" hidden>
+      <section
+        class="signup-success-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="회원가입 성공"
+        aria-describedby="signup-success-message"
+      >
+        <p id="signup-success-message">회원가입이 완료되었습니다.</p>
+        <button class="btn btn-primary" type="button" id="signup-success-confirm">확인</button>
       </section>
     </div>
   </main>
