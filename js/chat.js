@@ -28,7 +28,8 @@ const state = {
   detailLoadVersion: 0,
   hasOlderMessages: false,
   loadingOlderMessages: false,
-  hasConnected: false
+  hasConnected: false,
+  authenticationFailureHandled: false
 };
 
 const dom = {
@@ -328,8 +329,17 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
 
     const metadata = createElement("div", "cw-message-meta");
     const unreadCount = unreadCountForMessage(message);
-    if (unreadCount > 0) metadata.append(createElement("span", "cw-message-unread", String(unreadCount)));
-    metadata.append(createElement("span", "cw-message-time", formatMessageTime(message.createdAt)));
+    const unread = unreadCount > 0
+      ? createElement("span", "cw-message-unread", String(unreadCount))
+      : null;
+    const time = createElement("span", "cw-message-time", formatMessageTime(message.createdAt));
+    if (mine) {
+      if (unread) metadata.append(unread);
+      metadata.append(time);
+    } else {
+      metadata.append(time);
+      if (unread) metadata.append(unread);
+    }
     body.append(metadata);
     row.append(body);
     dom.messages.append(row);
@@ -368,9 +378,26 @@ const setSubmitting = (form, submitting) => {
   [...form.elements].forEach((element) => { element.disabled = submitting; });
 };
 
+const isAuthenticationError = (error) => {
+  const code = error?.code;
+  return Number(error?.status) === 401
+    || (typeof code === "string" && (/^J00[1-8]$/.test(code) || code === "W001"));
+};
+
+const handleAuthenticationFailure = () => {
+  if (state.authenticationFailureHandled) return;
+  state.authenticationFailureHandled = true;
+  Promise.resolve(socket.disconnect()).catch(() => {});
+  showMessage("로그인이 필요합니다.", redirectToLogin);
+};
+
 const handleError = (error) => {
   if (error?.name === "AbortError") return;
-  showMessage(error?.message || String(error), error?.status === 401 ? redirectToLogin : null);
+  if (isAuthenticationError(error)) {
+    handleAuthenticationFailure();
+    return;
+  }
+  showMessage(error?.message || String(error));
 };
 
 const redirectToLogin = () => {
@@ -870,10 +897,10 @@ const socket = new ChatSocket({
   onConnected: handleSocketConnected,
   onListEvent: handleRoomListEvent,
   onRoomEvent: handleRoomEvent,
-  onError: (message, options = {}) => {
-    if (!options.transient) showMessage(message);
+  onError: (error) => {
+    if (!error?.transient) handleError(error);
   },
-  onAuthFailure: () => redirectToLogin()
+  onAuthFailure: handleAuthenticationFailure
 });
 
 const bindEvents = () => {
@@ -915,7 +942,7 @@ const bindEvents = () => {
   $("#cw-new-chat-friends").addEventListener("change", () => {
     const count = $$(".cw-new-chat-check:checked").length;
     $("#cw-new-chat-submit").disabled = count === 0;
-    $("#cw-group-name-field").hidden = count < 2;
+    $("#cw-group-name-field").hidden = count === 0;
   });
 
   $("#cw-new-chat-form").addEventListener("submit", async (event) => {
@@ -925,9 +952,7 @@ const bindEvents = () => {
     if (!friendIds.length) return;
     setSubmitting(form, true);
     try {
-      const result = friendIds.length === 1
-        ? await api.createDirectRoom(friendIds[0])
-        : await api.createGroupRoom(friendIds, $("#cw-group-name").value.trim());
+      const result = await api.createGroupRoom(friendIds, $("#cw-group-name").value.trim());
       closeDialogs();
       await syncRoomList();
       await openRoom(toNumber(result.chatRoomId));
@@ -1073,7 +1098,7 @@ const bootstrap = async () => {
     renderCurrentUser();
     socket.connect();
   } catch (error) {
-    showMessage(error.message || "로그인이 필요합니다.", redirectToLogin);
+    handleError(error);
   }
 };
 

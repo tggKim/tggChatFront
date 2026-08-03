@@ -10,7 +10,7 @@ export class ChatSocket {
 
   connect() {
     if (!window.SockJS || !window.StompJs) {
-      this.callbacks.onError("실시간 통신 라이브러리를 불러오지 못했습니다.");
+      this.callbacks.onError({ message: "실시간 통신 라이브러리를 불러오지 못했습니다." });
       return;
     }
 
@@ -31,7 +31,7 @@ export class ChatSocket {
       onConnect: () => {
         this.client.subscribe("/user/queue/errors", (frame) => {
           const error = this.parseFrame(frame);
-          this.callbacks.onError(error?.message || "실시간 요청을 처리하지 못했습니다.");
+          this.callbacks.onError(error || { message: "실시간 요청을 처리하지 못했습니다." });
         });
         this.client.subscribe("/user/queue/chatRooms/list", (frame) => {
           const event = this.parseFrame(frame);
@@ -42,10 +42,12 @@ export class ChatSocket {
       },
       onStompError: (frame) => {
         const body = this.parseFrame(frame);
-        this.callbacks.onError(body?.message || frame.headers?.message || "실시간 연결 오류가 발생했습니다.");
+        this.callbacks.onError(body || {
+          message: frame.headers?.message || "실시간 연결 오류가 발생했습니다."
+        });
       },
       onWebSocketError: () => {
-        this.callbacks.onError("실시간 연결을 확인하고 있습니다.", { transient: true });
+        this.callbacks.onError({ message: "실시간 연결을 확인하고 있습니다.", transient: true });
       }
     });
 
