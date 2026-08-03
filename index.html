@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TGG Chat | 로그인</title>
+  <link rel="stylesheet" href="css/auth.css" />
+  <script src="js/auth.js" defer></script>
+</head>
+<body>
+  <main class="auth-page">
+    <section class="auth-shell" aria-labelledby="auth-title">
+      <header class="auth-header">
+        <span class="auth-brand-mark" aria-hidden="true">T</span>
+        <span class="auth-brand-name">TGG Chat</span>
+      </header>
+
+      <form class="auth-form" id="login-form">
+        <div class="auth-heading">
+          <h1 id="auth-title">로그인</h1>
+        </div>
+
+        <div class="form-field">
+          <label for="login-email">이메일</label>
+          <input
+            id="login-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            maxlength="254"
+            required
+          />
+        </div>
+
+        <div class="form-field">
+          <label for="login-password">비밀번호</label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+
+        <div class="auth-actions">
+          <button class="btn btn-primary" type="submit" id="login-submit">로그인</button>
+          <button class="btn" type="button" id="show-signup">회원가입</button>
+        </div>
+      </form>
+
+      <form class="auth-form" id="signup-form" hidden>
+        <div class="auth-heading">
+          <h1>회원가입</h1>
+        </div>
+
+        <div class="form-field">
+          <label for="signup-email">이메일</label>
+          <input
+            id="signup-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            maxlength="254"
+            required
+          />
+        </div>
+
+        <div class="form-field">
+          <label for="signup-password">비밀번호</label>
+          <input
+            id="signup-password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+
+        <div class="form-field">
+          <label for="signup-username">유저명</label>
+          <input
+            id="signup-username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            maxlength="50"
+            required
+          />
+        </div>
+
+        <div class="auth-actions">
+          <button class="btn btn-primary" type="submit" id="signup-submit">회원가입</button>
+          <button class="btn" type="button" id="show-login">로그인으로 돌아가기</button>
+        </div>
+      </form>
+
+      <p class="auth-status" id="auth-status" role="status" hidden></p>
+    </section>
+
+    <div class="dialog-backdrop" id="error-dialog" hidden>
+      <section
+        class="error-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="error-title"
+        aria-describedby="error-message"
+      >
+        <h2 id="error-title">요청을 처리하지 못했습니다</h2>
+        <p id="error-message"></p>
+        <button class="btn btn-primary" type="button" id="error-confirm">확인</button>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
