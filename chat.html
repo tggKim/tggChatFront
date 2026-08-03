@@ -3,281 +3,252 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Chat App Wireframe</title>
+  <title>TGG Chat</title>
   <link rel="stylesheet" href="css/chat.css" />
   <script src="https://unpkg.com/lucide@0.468.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.1.1/bundles/stomp.umd.min.js"></script>
 </head>
 <body>
 <main class="app-container">
-<div id="chat-layout-wireframe" aria-label="채팅 애플리케이션 화면 배치 와이어프레임">
+  <div id="chat-layout-wireframe" aria-label="TGG 채팅 애플리케이션">
+    <div class="cw-shell">
+      <aside class="cw-sidebar" aria-label="채팅 탐색">
+        <header class="cw-sidebar-header">
+          <span class="cw-sidebar-title" id="cw-sidebar-title">채팅</span>
+          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-new-chat-button" aria-label="새 채팅방" data-tooltip="새 채팅방">
+            <i data-lucide="square-pen" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-add-friend-button" aria-label="친구 추가" data-tooltip="친구 추가" hidden>
+            <i data-lucide="user-plus" aria-hidden="true"></i>
+          </button>
+        </header>
 
+        <div class="cw-room-list cw-sidebar-view" id="cw-chat-list-view" aria-live="polite">
+          <div class="cw-list-state">채팅방을 불러오는 중입니다.</div>
+        </div>
 
-  <div class="cw-shell">
-    <aside class="cw-sidebar" aria-label="채팅방 목록">
-      <div class="cw-sidebar-header">
-        <span class="cw-sidebar-title" id="cw-sidebar-title">채팅</span>
-        <button type="button" class="btn btn-ghost cw-icon-button" id="cw-new-chat-button" aria-label="새 채팅방" data-tooltip="새 채팅방">
-          <i data-lucide="square-pen" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="btn btn-ghost cw-icon-button" id="cw-add-friend-button" aria-label="친구 추가" data-tooltip="친구 추가" hidden>
-          <i data-lucide="user-plus" aria-hidden="true"></i>
-        </button>
-      </div>
+        <div class="cw-room-list cw-sidebar-view" id="cw-friend-list-view" hidden aria-live="polite">
+          <div class="cw-list-state">친구를 불러오는 중입니다.</div>
+        </div>
 
-      <div class="cw-room-list cw-sidebar-view" id="cw-chat-list-view">
-        <button type="button" class="cw-room-row is-selected" aria-pressed="true" data-room="project">
-          <span class="cw-avatar-stack" aria-label="전체 5명 중 상대 프로필 이미지 4개">
-            <span class="cw-avatar">민</span><span class="cw-avatar">영</span><span class="cw-avatar">철</span><span class="cw-avatar">준</span>
-          </span>
-          <span class="cw-room-copy">
-          <span class="cw-room-title-line"><span class="cw-room-title">백엔드 프로젝트</span><span class="cw-room-count text-small">5</span></span>
-            <span class="cw-preview text-small">API 명세 수정했습니다.</span>
-          </span>
-          <span class="cw-time text-small">10:24</span>
-        </button>
-
-        <button type="button" class="cw-room-row" aria-pressed="false" data-room="direct">
-          <span class="cw-avatar-stack" aria-label="지현 프로필 이미지"><span class="cw-avatar">지</span></span>
-          <span class="cw-room-copy">
-            <span class="cw-room-title-line"><span class="cw-room-title">지현</span></span>
-            <span class="cw-preview text-small">내일 확인해볼게요.</span>
-          </span>
-          <span class="cw-time text-small">09:11</span>
-        </button>
-
-        <button type="button" class="cw-room-row" aria-pressed="false" data-room="study">
-          <span class="cw-avatar-stack" aria-label="전체 3명 중 상대 프로필 이미지 2개"><span class="cw-avatar">수</span><span class="cw-avatar">준</span></span>
-          <span class="cw-room-copy">
-          <span class="cw-room-title-line"><span class="cw-room-title">주말 스터디</span><span class="cw-room-count text-small">3</span></span>
-          <span class="cw-preview text-small">이번 주는 온라인으로 진행합니다.</span>
-        </span>
-        <span class="cw-time text-small">어제</span>
-      </button>
-
-      <button type="button" class="cw-room-row" aria-pressed="false" data-room="release">
-        <span class="cw-avatar-stack" aria-label="전체 4명 중 상대 프로필 이미지 3개"><span class="cw-avatar">은</span><span class="cw-avatar">도</span><span class="cw-avatar">하</span></span>
-        <span class="cw-room-copy">
-          <span class="cw-room-title-line"><span class="cw-room-title">배포 준비방</span><span class="cw-room-count text-small">4</span></span>
-          <span class="cw-preview text-small">배포 전 확인 사항 공유할게요.</span>
-        </span>
-        <span class="cw-time text-small">월</span>
-      </button>
-
-      <button type="button" class="cw-room-row" aria-pressed="false" data-room="frontend">
-        <span class="cw-avatar-stack" aria-label="전체 7명 중 상대 프로필 이미지 4개, 외 2명"><span class="cw-avatar">서</span><span class="cw-avatar">유</span><span class="cw-avatar">재</span><span class="cw-avatar">원</span><span class="cw-avatar cw-avatar-overflow">외2</span></span>
-        <span class="cw-room-copy">
-          <span class="cw-room-title-line"><span class="cw-room-title">프론트 협업방</span><span class="cw-room-count text-small">7</span></span>
-          <span class="cw-preview text-small">컴포넌트 구조 정리해서 공유했습니다.</span>
-        </span>
-        <span class="cw-time text-small">일</span>
-      </button>
-      </div>
-
-      <div class="cw-room-list cw-sidebar-view" id="cw-friend-list-view" hidden>
-        <button type="button" class="cw-friend-row" data-friend-name="민수" data-friend-initial="민"><span class="cw-avatar">민</span><span>민수</span><span></span></button>
-        <button type="button" class="cw-friend-row" data-friend-name="영희" data-friend-initial="영"><span class="cw-avatar">영</span><span>영희</span><span></span></button>
-        <button type="button" class="cw-friend-row" data-friend-name="지현" data-friend-initial="지"><span class="cw-avatar">지</span><span>지현</span><span></span></button>
-        <button type="button" class="cw-friend-row" data-friend-name="철수" data-friend-initial="철"><span class="cw-avatar">철</span><span>철수</span><span></span></button>
-      </div>
-
-      <div class="cw-room-list cw-sidebar-view" id="cw-settings-view" hidden>
-        <div class="cw-settings-profile">
-          <div class="cw-profile-image-control">
-            <span class="cw-avatar cw-avatar-profile" aria-label="현재 프로필 이미지">나</span>
-            <button type="button" class="btn btn-primary cw-icon-button cw-profile-camera-button" aria-label="프로필 이미지 수정" data-tooltip="프로필 이미지 수정"><i class="cw-profile-camera-icon" data-lucide="camera" aria-hidden="true"></i></button>
-          </div>
-          <div class="cw-profile-name-control">
-            <span class="cw-profile-name">tgg</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" aria-label="내 이름 수정" data-tooltip="내 이름 수정"><i data-lucide="pencil" aria-hidden="true"></i></button>
+        <div class="cw-room-list cw-sidebar-view" id="cw-settings-view" hidden>
+          <div class="cw-settings-profile">
+            <div class="cw-profile-image-control">
+              <span class="cw-avatar cw-avatar-profile" id="cw-my-avatar" aria-label="현재 프로필 이미지">?</span>
+              <button type="button" class="btn btn-primary cw-icon-button cw-profile-camera-button" id="cw-profile-image-button" aria-label="프로필 이미지 수정" data-tooltip="프로필 이미지 수정 준비 중">
+                <i class="cw-profile-camera-icon" data-lucide="camera" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="cw-profile-name-control">
+              <span class="cw-profile-name" id="cw-my-name">-</span>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-my-name" aria-label="내 이름 수정" data-tooltip="내 이름 수정">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button type="button" class="btn" id="cw-logout-button">로그아웃</button>
           </div>
         </div>
-      </div>
 
-      <nav class="cw-bottom-nav" aria-label="주요 메뉴">
-        <button type="button" class="cw-nav-button" id="cw-friends-tab" aria-selected="false">
-          <i data-lucide="users" aria-hidden="true"></i><span class="text-small">친구</span>
-        </button>
-        <button type="button" class="cw-nav-button is-selected" id="cw-chats-tab" aria-selected="true">
-          <i data-lucide="message-circle" aria-hidden="true"></i><span class="text-small">채팅</span>
-        </button>
-        <button type="button" class="cw-nav-button" id="cw-settings-tab" aria-selected="false">
-          <i data-lucide="settings" aria-hidden="true"></i><span class="text-small">설정</span>
-        </button>
-      </nav>
-    </aside>
-
-    <section class="cw-main" aria-label="선택한 채팅방">
-      <header class="cw-room-header">
-        <span class="cw-avatar-stack" aria-label="전체 5명 중 상대 프로필 이미지 4개">
-          <span class="cw-avatar cw-avatar-large">민</span><span class="cw-avatar cw-avatar-large">영</span><span class="cw-avatar cw-avatar-large">철</span><span class="cw-avatar cw-avatar-large">준</span>
-        </span>
-        <div class="cw-room-header-copy">
-          <div class="cw-room-name">백엔드 프로젝트</div>
-          <div class="cw-member-count text-small">5명</div>
-        </div>
-        <div class="cw-header-actions">
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-button" aria-label="사용자 초대" aria-expanded="false" data-tooltip="사용자 초대">
-            <i data-lucide="plus" aria-hidden="true"></i>
+        <nav class="cw-bottom-nav" aria-label="주요 메뉴">
+          <button type="button" class="cw-nav-button" id="cw-friends-tab" aria-selected="false">
+            <i data-lucide="users" aria-hidden="true"></i><span class="text-small">친구</span>
           </button>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-button" aria-label="채팅방 이름 편집" aria-expanded="false" data-tooltip="이름 편집">
-            <i data-lucide="pencil" aria-hidden="true"></i>
+          <button type="button" class="cw-nav-button is-selected" id="cw-chats-tab" aria-selected="true">
+            <i data-lucide="message-circle" aria-hidden="true"></i><span class="text-small">채팅</span>
           </button>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-button" aria-label="참여자 상세정보" aria-expanded="false" data-tooltip="참여자 정보">
-            <i data-lucide="users" aria-hidden="true"></i>
+          <button type="button" class="cw-nav-button" id="cw-settings-tab" aria-selected="false">
+            <i data-lucide="settings" aria-hidden="true"></i><span class="text-small">설정</span>
           </button>
-        </div>
-      </header>
-
-      <div class="cw-messages" aria-label="메시지 내용">
-        <div class="cw-message-row">
-          <span class="cw-avatar">민</span>
-          <div class="cw-message">채팅방 이름 변경 API까지 반영했습니다.</div>
-        </div>
-        <div class="cw-message-row mine">
-          <div class="cw-message">이벤트 구조 확인하고 연결할게요.</div>
-        </div>
-        <div class="cw-message-row">
-          <span class="cw-avatar">영</span>
-          <div class="cw-message">오른쪽 헤더도 같은 이름으로 바로 바뀌면 될 것 같아요.</div>
-        </div>
-      </div>
-
-      <div class="cw-composer">
-        <button type="button" class="btn btn-ghost cw-icon-button" aria-label="파일 첨부" data-tooltip="파일 첨부"><i data-lucide="paperclip" aria-hidden="true"></i></button>
-        <input class="form-control" aria-label="메시지 입력" placeholder="메시지를 입력하세요" />
-        <button type="button" class="btn btn-primary cw-icon-button" aria-label="메시지 전송" data-tooltip="전송"><i data-lucide="send" aria-hidden="true"></i></button>
-      </div>
-
-      <section class="card cw-name-popover" id="cw-name-popover" aria-label="채팅방 이름 편집" hidden>
-        <div class="cw-popover-header">
-          <span class="cw-sidebar-title">이름 설정</span>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-close" aria-label="이름 편집 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
-        </div>
-        <div class="cw-current-name">
-          <span class="cw-label text-small">현재 표시 이름</span>
-          <strong id="cw-display-name-setting">백엔드 프로젝트</strong>
-        </div>
-        <div class="cw-name-setting-row">
-          <div class="cw-name-setting-copy">
-            <span class="cw-label text-small">기본 이름</span>
-            <span class="cw-name-setting-value" id="cw-base-name-value">프로젝트 채팅방</span>
-          </div>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-base-name" aria-label="기본 이름 수정" data-tooltip="방장만 수정 가능">
-            <i data-lucide="pencil" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div class="cw-name-setting-row">
-          <div class="cw-name-setting-copy">
-            <span class="cw-label text-small">내가 보는 이름</span>
-            <span class="cw-name-setting-value" id="cw-custom-name-value">백엔드 프로젝트</span>
-          </div>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-custom-name" aria-label="내가 보는 이름 수정" data-tooltip="내 이름 수정">
-            <i data-lucide="pencil" aria-hidden="true"></i>
-          </button>
-        </div>
-      </section>
-
-      <aside class="cw-detail-panel" id="cw-detail-panel" aria-label="참여자 상세정보" hidden>
-        <div class="cw-detail-header">
-          <span class="cw-sidebar-title">참여자 5명</span>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-close" aria-label="상세정보 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
-        </div>
-        <div class="cw-member-list">
-          <div class="cw-member-row"><span class="cw-avatar">나</span><span>나</span><span class="viz-badge">OWNER</span></div>
-          <div class="cw-member-row"><span class="cw-avatar">민</span><span>민수</span><span class="text-small text-muted">MEMBER</span></div>
-          <div class="cw-member-row"><span class="cw-avatar">영</span><span>영희</span><span class="text-small text-muted">MEMBER</span></div>
-          <div class="cw-member-row"><span class="cw-avatar">철</span><span>철수</span><span class="text-small text-muted">MEMBER</span></div>
-          <div class="cw-member-row"><span class="cw-avatar">준</span><span>준호</span><span class="text-small text-muted">MEMBER</span></div>
-        </div>
+        </nav>
       </aside>
 
-      <div class="cw-dialog-backdrop" id="cw-edit-dialog" hidden>
-        <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-edit-dialog-title">
+      <section class="cw-main" id="cw-main" aria-label="선택한 채팅방">
+        <div class="cw-empty-room" id="cw-empty-room">
+          <i data-lucide="message-circle" aria-hidden="true"></i>
+          <span>채팅방을 선택하세요.</span>
+        </div>
+
+        <div class="cw-active-room" id="cw-active-room" hidden>
+          <header class="cw-room-header">
+            <span class="cw-avatar-stack" id="cw-room-header-avatars"></span>
+            <div class="cw-room-header-copy">
+              <div class="cw-room-name" id="cw-room-header-name"></div>
+              <div class="cw-member-count text-small" id="cw-room-header-count"></div>
+            </div>
+            <div class="cw-header-actions">
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-button" aria-label="사용자 초대" data-tooltip="사용자 초대">
+                <i data-lucide="plus" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-button" aria-label="채팅방 이름 편집" aria-expanded="false" data-tooltip="이름 편집">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-button" aria-label="참여자 상세정보" aria-expanded="false" data-tooltip="참여자 정보">
+                <i data-lucide="users" aria-hidden="true"></i>
+              </button>
+            </div>
+          </header>
+
+          <div class="cw-messages" id="cw-messages" aria-label="메시지 내용" aria-live="polite">
+            <button type="button" class="btn cw-load-older" id="cw-load-older">이전 메시지</button>
+            <div class="cw-list-state">메시지를 불러오는 중입니다.</div>
+          </div>
+
+          <form class="cw-composer" id="cw-composer">
+            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-file-button" aria-label="파일 첨부" data-tooltip="파일 첨부 준비 중">
+              <i data-lucide="paperclip" aria-hidden="true"></i>
+            </button>
+            <input class="form-control" id="cw-message-input" aria-label="메시지 입력" placeholder="메시지를 입력하세요" autocomplete="off" />
+            <button type="submit" class="btn btn-primary cw-icon-button" aria-label="메시지 전송" data-tooltip="전송">
+              <i data-lucide="send" aria-hidden="true"></i>
+            </button>
+          </form>
+        </div>
+
+        <section class="card cw-name-popover" id="cw-name-popover" aria-label="채팅방 이름 편집" hidden>
           <div class="cw-popover-header">
-            <span class="cw-sidebar-title" id="cw-edit-dialog-title">이름 수정</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-dialog-close" aria-label="이름 수정 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+            <span class="cw-sidebar-title">이름 설정</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-close" aria-label="이름 편집 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
           </div>
-          <label class="form-label" id="cw-edit-input-label" for="cw-edit-input">이름</label>
-          <input id="cw-edit-input" class="form-control" value="" />
+          <div class="cw-current-name">
+            <span class="cw-label text-small">현재 표시 이름</span>
+            <strong id="cw-display-name-setting"></strong>
+          </div>
+          <div class="cw-name-setting-row">
+            <div class="cw-name-setting-copy">
+              <span class="cw-label text-small">기본 이름</span>
+              <span class="cw-name-setting-value" id="cw-base-name-value">설정되지 않음</span>
+            </div>
+            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-base-name" aria-label="기본 이름 수정" data-tooltip="방장만 수정 가능">
+              <i data-lucide="pencil" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="cw-name-setting-row">
+            <div class="cw-name-setting-copy">
+              <span class="cw-label text-small">내가 보는 이름</span>
+              <span class="cw-name-setting-value" id="cw-custom-name-value">설정되지 않음</span>
+            </div>
+            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-custom-name" aria-label="내가 보는 이름 수정" data-tooltip="내 이름 수정">
+              <i data-lucide="pencil" aria-hidden="true"></i>
+            </button>
+          </div>
+        </section>
+
+        <aside class="cw-detail-panel" id="cw-detail-panel" aria-label="참여자 상세정보" hidden>
+          <div class="cw-detail-header">
+            <span class="cw-sidebar-title" id="cw-detail-title">참여자</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-close" aria-label="상세정보 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <div class="cw-member-list" id="cw-member-list"></div>
+          <button type="button" class="btn btn-danger btn-block cw-leave-button" id="cw-leave-button">채팅방 나가기</button>
+        </aside>
+      </section>
+
+      <div class="cw-dialog-backdrop" id="cw-friend-add-dialog" hidden>
+        <form class="card cw-dialog" id="cw-friend-add-form" role="dialog" aria-modal="true" aria-labelledby="cw-friend-add-title">
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title" id="cw-friend-add-title">친구 추가</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="친구 추가 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <label class="form-label" for="cw-friend-username">친구 이름</label>
+          <input id="cw-friend-username" class="form-control" maxlength="50" placeholder="정확한 사용자명을 입력하세요" required />
           <div class="cw-dialog-actions">
-            <button type="button" class="btn" id="cw-edit-cancel">취소</button>
-            <button type="button" class="btn btn-primary" id="cw-edit-save">저장</button>
+            <button type="button" class="btn" data-close-dialog>취소</button>
+            <button type="submit" class="btn btn-primary">추가</button>
           </div>
+        </form>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-new-chat-dialog" hidden>
+        <form class="card cw-dialog" id="cw-new-chat-form" role="dialog" aria-modal="true" aria-labelledby="cw-new-chat-title">
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title" id="cw-new-chat-title">새 채팅방</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="새 채팅방 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <div class="cw-invite-list" id="cw-new-chat-friends" aria-label="친구 선택"></div>
+          <div class="cw-field" id="cw-group-name-field" hidden>
+            <label class="form-label" for="cw-group-name">기본 채팅방 이름 <span class="text-muted">선택</span></label>
+            <input id="cw-group-name" class="form-control" maxlength="100" />
+          </div>
+          <div class="cw-dialog-actions">
+            <button type="button" class="btn" data-close-dialog>취소</button>
+            <button type="submit" class="btn btn-primary" id="cw-new-chat-submit" disabled>채팅 시작</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-friend-profile-dialog" hidden>
+        <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-friend-profile-title">
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title" id="cw-friend-profile-title">친구 프로필</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="친구 프로필 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <div class="cw-profile-dialog-body">
+            <span class="cw-avatar cw-avatar-profile" id="cw-friend-profile-avatar">?</span>
+            <span class="cw-profile-dialog-name" id="cw-friend-profile-name"></span>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="cw-friend-profile-chat">채팅하기</button>
         </section>
       </div>
 
       <div class="cw-dialog-backdrop" id="cw-invite-dialog" hidden>
-        <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-invite-dialog-title">
+        <form class="card cw-dialog" id="cw-invite-form" role="dialog" aria-modal="true" aria-labelledby="cw-invite-title">
           <div class="cw-popover-header">
-            <span class="cw-sidebar-title" id="cw-invite-dialog-title">사용자 초대</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-dialog-close" aria-label="사용자 초대 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+            <span class="cw-sidebar-title" id="cw-invite-title">사용자 초대</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="사용자 초대 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
           </div>
-          <div class="cw-invite-list">
-            <label class="cw-invite-row"><span class="cw-avatar">은</span><span>은지</span><input class="form-check-input" type="checkbox" /></label>
-            <label class="cw-invite-row"><span class="cw-avatar">도</span><span>도윤</span><input class="form-check-input" type="checkbox" checked /></label>
-            <label class="cw-invite-row"><span class="cw-avatar">하</span><span>하린</span><input class="form-check-input" type="checkbox" /></label>
+          <div class="cw-invite-list" id="cw-invitable-friends"></div>
+          <div class="cw-dialog-actions">
+            <button type="button" class="btn" data-close-dialog>취소</button>
+            <button type="submit" class="btn btn-primary" id="cw-invite-submit" disabled>초대</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-edit-dialog" hidden>
+        <form class="card cw-dialog" id="cw-edit-form" role="dialog" aria-modal="true" aria-labelledby="cw-edit-dialog-title">
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title" id="cw-edit-dialog-title">이름 수정</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="이름 수정 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <label class="form-label" id="cw-edit-input-label" for="cw-edit-input">이름</label>
+          <input id="cw-edit-input" class="form-control" maxlength="100" required />
+          <div class="cw-dialog-actions">
+            <button type="button" class="btn" data-close-dialog>취소</button>
+            <button type="submit" class="btn btn-primary">저장</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-leave-dialog" hidden>
+        <form class="card cw-dialog" id="cw-leave-form" role="dialog" aria-modal="true" aria-labelledby="cw-leave-title">
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title" id="cw-leave-title">채팅방 나가기</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="채팅방 나가기 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <p class="cw-dialog-copy" id="cw-leave-copy">채팅방을 나가시겠습니까?</p>
+          <div class="cw-field" id="cw-next-owner-field" hidden>
+            <label class="form-label" for="cw-next-owner">다음 방장</label>
+            <select id="cw-next-owner" class="form-control"></select>
           </div>
           <div class="cw-dialog-actions">
-            <button type="button" class="btn" id="cw-invite-cancel">취소</button>
-            <button type="button" class="btn btn-primary" id="cw-invite-submit">초대</button>
+            <button type="button" class="btn" data-close-dialog>취소</button>
+            <button type="submit" class="btn btn-danger">나가기</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-message-dialog" hidden>
+        <section class="card cw-dialog" role="alertdialog" aria-modal="true" aria-labelledby="cw-message-dialog-text">
+          <p class="cw-dialog-copy" id="cw-message-dialog-text"></p>
+          <div class="cw-dialog-actions">
+            <button type="button" class="btn btn-primary" id="cw-message-dialog-confirm">확인</button>
           </div>
         </section>
       </div>
-    </section>
-
-    <div class="cw-dialog-backdrop" id="cw-friend-search-dialog" hidden>
-      <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-friend-search-title">
-        <div class="cw-popover-header">
-          <span class="cw-sidebar-title" id="cw-friend-search-title">친구 추가</span>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-friend-search-close" aria-label="친구 추가 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
-        </div>
-        <label class="form-label" for="cw-friend-search-input">친구 이름</label>
-        <div class="cw-search-row">
-          <input id="cw-friend-search-input" class="form-control" placeholder="이름을 입력하세요" />
-          <button type="button" class="btn btn-primary" id="cw-friend-search-submit"><i data-lucide="search" aria-hidden="true"></i><span class="sr-only">검색</span></button>
-        </div>
-        <div class="cw-search-result" id="cw-friend-search-result" hidden>
-          <span class="cw-avatar">은</span><span>은지</span><button type="button" class="btn">친구 추가</button>
-        </div>
-      </section>
-    </div>
-
-    <div class="cw-dialog-backdrop" id="cw-new-chat-dialog" hidden>
-      <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-new-chat-title">
-        <div class="cw-popover-header">
-          <span class="cw-sidebar-title" id="cw-new-chat-title">새 채팅방</span>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-new-chat-close" aria-label="새 채팅방 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
-        </div>
-        <div class="cw-invite-list" aria-label="친구 선택">
-          <label class="cw-invite-row"><span class="cw-avatar">민</span><span>민수</span><input class="form-check-input cw-new-chat-check" type="checkbox" /></label>
-          <label class="cw-invite-row"><span class="cw-avatar">영</span><span>영희</span><input class="form-check-input cw-new-chat-check" type="checkbox" /></label>
-          <label class="cw-invite-row"><span class="cw-avatar">지</span><span>지현</span><input class="form-check-input cw-new-chat-check" type="checkbox" /></label>
-          <label class="cw-invite-row"><span class="cw-avatar">철</span><span>철수</span><input class="form-check-input cw-new-chat-check" type="checkbox" /></label>
-        </div>
-        <div class="cw-dialog-actions">
-          <button type="button" class="btn" id="cw-new-chat-cancel">취소</button>
-          <button type="button" class="btn btn-primary" id="cw-new-chat-submit" disabled>채팅 시작</button>
-        </div>
-      </section>
-    </div>
-
-    <div class="cw-dialog-backdrop" id="cw-friend-profile-dialog" hidden>
-      <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-friend-profile-title">
-        <div class="cw-popover-header">
-          <span class="cw-sidebar-title" id="cw-friend-profile-title">친구 프로필</span>
-          <button type="button" class="btn btn-ghost cw-icon-button" id="cw-friend-profile-close" aria-label="친구 프로필 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
-        </div>
-        <div class="cw-profile-dialog-body">
-          <span class="cw-avatar cw-avatar-profile" id="cw-friend-profile-avatar" aria-label="친구 프로필 이미지">민</span>
-          <span class="cw-profile-dialog-name" id="cw-friend-profile-name">민수</span>
-        </div>
-        <button type="button" class="btn btn-primary btn-block" id="cw-friend-profile-chat">채팅하기</button>
-      </section>
     </div>
   </div>
-
-  <script src="js/chat.js"></script>
-</div>
 </main>
+<script type="module" src="js/chat.js"></script>
 </body>
 </html>
