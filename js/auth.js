@@ -18,7 +18,6 @@
   const signupSuccessConfirmButton = document.getElementById("signup-success-confirm");
 
   let previouslyFocusedElement = null;
-  let pendingSignupEmail = "";
 
   const setView = (view) => {
     const showLogin = view === "login";
@@ -58,16 +57,14 @@
     }
   };
 
-  const showSignupSuccess = (email) => {
-    pendingSignupEmail = email;
+  const showSignupSuccess = () => {
     signupSuccessDialog.hidden = false;
     signupSuccessConfirmButton.focus();
   };
 
   const confirmSignupSuccess = () => {
     signupSuccessDialog.hidden = true;
-    loginEmailInput.value = pendingSignupEmail;
-    pendingSignupEmail = "";
+    loginForm.reset();
     signupForm.reset();
     setView("login");
   };
@@ -151,7 +148,7 @@
         method: "POST",
         body: JSON.stringify(requestBody)
       });
-      showSignupSuccess(requestBody.email);
+      showSignupSuccess();
     } catch (error) {
       showError(error.message);
     } finally {
@@ -165,6 +162,12 @@
   errorDialog.addEventListener("click", (event) => {
     if (event.target === errorDialog) {
       closeError();
+    }
+  });
+
+  signupSuccessDialog.addEventListener("click", (event) => {
+    if (event.target === signupSuccessDialog) {
+      confirmSignupSuccess();
     }
   });
 
