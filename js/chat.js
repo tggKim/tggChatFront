@@ -25,6 +25,7 @@ const state = {
   readTimer: null,
   membershipRefreshTimer: null,
   membershipRefreshVersion: 0,
+  detailLoadVersion: 0,
   hasOlderMessages: false,
   loadingOlderMessages: false,
   hasConnected: false
@@ -79,18 +80,41 @@ const toNumber = (value) => value == null ? null : Number(value);
 
 const initial = (username) => username?.trim()?.[0] || "?";
 
-const createAvatar = (username, profileImageKey, extraClass = "") => {
-  const avatar = createElement("span", `cw-avatar ${extraClass}`.trim(), initial(username));
+const renderIcons = () => {
+  if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+};
+
+const setAvatar = (avatar, username, profileImageKey) => {
+  avatar.replaceChildren();
   avatar.setAttribute("aria-label", `${username || "알 수 없는 사용자"} 프로필 이미지`);
-  if (profileImageKey) avatar.dataset.profileImageKey = profileImageKey;
+
+  if (profileImageKey) {
+    avatar.dataset.profileImageKey = profileImageKey;
+    avatar.classList.remove("cw-avatar-default");
+    avatar.textContent = initial(username);
+    return avatar;
+  }
+
+  delete avatar.dataset.profileImageKey;
+  avatar.classList.add("cw-avatar-default");
+  const icon = createElement("i", "cw-avatar-default-icon");
+  icon.setAttribute("data-lucide", "user-round");
+  icon.setAttribute("aria-hidden", "true");
+  avatar.append(icon);
   return avatar;
+};
+
+const createAvatar = (username, profileImageKey, extraClass = "") => {
+  const avatar = createElement("span", `cw-avatar ${extraClass}`.trim());
+  return setAvatar(avatar, username, profileImageKey);
 };
 
 const displayRoomName = (room) => {
   if (room.customRoomName) return room.customRoomName;
   if (room.baseRoomName) return room.baseRoomName;
   const names = room.previewUsers.map((user) => user.username).filter(Boolean);
-  return names.length ? names.join(", ") : "채팅방";
+  if (names.length) return names.join(", ");
+  return room.roomType === "DIRECT" ? "?" : "";
 };
 
 const formatActivityTime = (value) => {
@@ -163,6 +187,7 @@ const renderAvatarStack = (container, room, large = false) => {
   if (!container.childElementCount) {
     container.append(createAvatar("?", null, large ? "cw-avatar-large" : ""));
   }
+  renderIcons();
 };
 
 const sortedRooms = () => [...state.rooms.values()].sort((left, right) => {
@@ -206,6 +231,7 @@ const renderRoomList = () => {
     row.append(avatars, copy, meta);
     dom.chatList.append(row);
   });
+  renderIcons();
 };
 
 const renderFriendList = () => {
@@ -226,12 +252,14 @@ const renderFriendList = () => {
     row.addEventListener("click", () => openFriendProfile(friend));
     dom.friendList.append(row);
   });
+  renderIcons();
 };
 
 const renderCurrentUser = () => {
   if (!state.me) return;
-  $("#cw-my-avatar").textContent = initial(state.me.username);
+  setAvatar($("#cw-my-avatar"), state.me.username, state.me.profileImageKey);
   $("#cw-my-name").textContent = state.me.username;
+  renderIcons();
 };
 
 const renderRoomHeader = () => {
@@ -312,6 +340,7 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
   } else {
     dom.messages.scrollTop = dom.messages.scrollHeight;
   }
+  renderIcons();
 };
 
 const showMessage = (message, action = null) => {
@@ -435,9 +464,12 @@ const removeRoom = (roomId) => {
     state.messages = [];
     state.readStates.clear();
     state.members = [];
+    state.detailLoadVersion += 1;
     state.hasOlderMessages = false;
     state.loadingOlderMessages = false;
     socket.unsubscribeRoom();
+    dom.detailPanel.hidden = true;
+    dom.namePopover.hidden = true;
     renderRoomHeader();
   }
 };
@@ -564,9 +596,12 @@ const openRoom = async (roomId) => {
   state.selectedRoomId = roomId;
   clearTimeout(state.membershipRefreshTimer);
   state.membershipRefreshVersion += 1;
+  state.detailLoadVersion += 1;
   state.messages = [];
   state.readStates.clear();
   state.members = [];
+  dom.detailPanel.hidden = true;
+  dom.namePopover.hidden = true;
   state.hasOlderMessages = false;
   state.loadingOlderMessages = false;
   socket.subscribeRoom(roomId);
@@ -671,14 +706,16 @@ const renderSelectableFriends = (container, friends, checkboxClass) => {
     );
     container.append(label);
   });
+  renderIcons();
 };
 
 const openFriendProfile = (friend) => {
   closeDialogs();
   state.selectedFriend = friend;
-  $("#cw-friend-profile-avatar").textContent = initial(friend.friendUsername);
+  setAvatar($("#cw-friend-profile-avatar"), friend.friendUsername, friend.profileImageKey);
   $("#cw-friend-profile-name").textContent = friend.friendUsername;
   $("#cw-friend-profile-dialog").hidden = false;
+  renderIcons();
 };
 
 const openNewChatDialog = () => {
@@ -734,17 +771,23 @@ const renderMembers = () => {
     dom.memberList.append(row);
   });
   dom.detailTitle.textContent = `참여자 ${state.members.length}명`;
+  renderIcons();
 };
 
 const openDetails = async () => {
-  if (!state.selectedRoomId) return;
+  const roomId = state.selectedRoomId;
+  if (!roomId) return;
+  const version = ++state.detailLoadVersion;
   dom.namePopover.hidden = true;
   dom.detailPanel.hidden = false;
   dom.memberList.replaceChildren(createElement("div", "cw-list-state", "참여자를 불러오는 중입니다."));
   try {
-    state.members = await api.getRoomMembers(state.selectedRoomId);
+    const members = await api.getRoomMembers(roomId);
+    if (state.selectedRoomId !== roomId || state.detailLoadVersion !== version || dom.detailPanel.hidden) return;
+    state.members = members;
     renderMembers();
   } catch (error) {
+    if (state.selectedRoomId !== roomId || state.detailLoadVersion !== version) return;
     dom.detailPanel.hidden = true;
     handleError(error);
   }
@@ -853,9 +896,10 @@ const bindEvents = () => {
 
   $("#cw-friend-add-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const username = $("#cw-friend-username").value.trim();
     if (!username) return;
-    setSubmitting(event.currentTarget, true);
+    setSubmitting(form, true);
     try {
       await api.addFriend(username);
       await loadFriends();
@@ -864,7 +908,7 @@ const bindEvents = () => {
     } catch (error) {
       handleError(error);
     } finally {
-      setSubmitting(event.currentTarget, false);
+      setSubmitting(form, false);
     }
   });
 
@@ -876,9 +920,10 @@ const bindEvents = () => {
 
   $("#cw-new-chat-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const friendIds = $$(".cw-new-chat-check:checked").map((checkbox) => Number(checkbox.value));
     if (!friendIds.length) return;
-    setSubmitting(event.currentTarget, true);
+    setSubmitting(form, true);
     try {
       const result = friendIds.length === 1
         ? await api.createDirectRoom(friendIds[0])
@@ -889,7 +934,7 @@ const bindEvents = () => {
     } catch (error) {
       handleError(error);
     } finally {
-      setSubmitting(event.currentTarget, false);
+      setSubmitting(form, false);
     }
   });
 
@@ -912,10 +957,11 @@ const bindEvents = () => {
   });
   $("#cw-invite-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const room = state.rooms.get(state.selectedRoomId);
     const friendIds = $$(".cw-invite-check:checked").map((checkbox) => Number(checkbox.value));
     if (!room || !friendIds.length) return;
-    setSubmitting(event.currentTarget, true);
+    setSubmitting(form, true);
     try {
       if (room.roomType === "DIRECT") {
         await api.inviteToDirectRoom(room.roomId, friendIds);
@@ -927,7 +973,7 @@ const bindEvents = () => {
     } catch (error) {
       handleError(error);
     } finally {
-      setSubmitting(event.currentTarget, false);
+      setSubmitting(form, false);
     }
   });
 
@@ -941,10 +987,11 @@ const bindEvents = () => {
   $("#cw-edit-my-name").addEventListener("click", () => openEditDialog("me"));
   $("#cw-edit-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const value = $("#cw-edit-input").value.trim();
     const roomId = state.selectedRoomId;
     if (!value) return;
-    setSubmitting(event.currentTarget, true);
+    setSubmitting(form, true);
     try {
       if (state.editTarget === "base") await api.updateBaseRoomName(roomId, value);
       if (state.editTarget === "custom") await api.updateCustomRoomName(roomId, value);
@@ -957,19 +1004,23 @@ const bindEvents = () => {
     } catch (error) {
       handleError(error);
     } finally {
-      setSubmitting(event.currentTarget, false);
+      setSubmitting(form, false);
     }
   });
 
   $("#cw-detail-button").addEventListener("click", openDetails);
-  $("#cw-detail-close").addEventListener("click", () => { dom.detailPanel.hidden = true; });
+  $("#cw-detail-close").addEventListener("click", () => {
+    state.detailLoadVersion += 1;
+    dom.detailPanel.hidden = true;
+  });
   $("#cw-leave-button").addEventListener("click", openLeaveDialog);
   $("#cw-leave-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const roomId = state.selectedRoomId;
     const nextOwnerField = $("#cw-next-owner-field");
     const nextOwnerId = nextOwnerField.hidden ? null : Number($("#cw-next-owner").value);
-    setSubmitting(event.currentTarget, true);
+    setSubmitting(form, true);
     try {
       await api.leaveRoom(roomId, nextOwnerId);
       closeDialogs();
@@ -978,7 +1029,7 @@ const bindEvents = () => {
     } catch (error) {
       handleError(error);
     } finally {
-      setSubmitting(event.currentTarget, false);
+      setSubmitting(form, false);
     }
   });
 

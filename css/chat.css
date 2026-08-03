@@ -473,6 +473,17 @@
       font-weight: 500;
     }
 
+    #chat-layout-wireframe .cw-avatar.cw-avatar-default {
+      background: #e7e9ed;
+      color: #68707d;
+    }
+
+    #chat-layout-wireframe .cw-avatar .cw-avatar-default-icon {
+      width: 56%;
+      height: 56%;
+      stroke-width: 1.8;
+    }
+
     #chat-layout-wireframe .cw-avatar + .cw-avatar {
       margin-left: -16px;
     }
