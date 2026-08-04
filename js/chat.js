@@ -375,6 +375,7 @@ const closeDialogs = () => {
     if (dialog !== dom.messageDialog) dialog.hidden = true;
   });
   dom.namePopover.hidden = true;
+  $("#cw-name-button").setAttribute("aria-expanded", "false");
 };
 
 const setSubmitting = (form, submitting) => {
@@ -855,23 +856,36 @@ const renderMembers = () => {
   dom.memberList.replaceChildren();
   state.members.forEach((member) => {
     const row = createElement("div", "cw-member-row");
-    const action = member.canAddFriend
-      ? createElement("button", "btn btn-small", "친구 추가")
-      : createElement("span", "text-small text-muted", member.chatRoomUserRole);
+    const friendAction = createElement("span", "cw-member-friend-action");
     if (member.canAddFriend) {
-      action.type = "button";
-      action.addEventListener("click", async () => {
+      const addFriendButton = createElement("button", "btn btn-ghost cw-icon-button");
+      const addFriendIcon = createElement("i");
+      addFriendButton.type = "button";
+      addFriendButton.setAttribute("aria-label", `${member.username} 친구 추가`);
+      addFriendButton.dataset.tooltip = "친구 추가";
+      addFriendIcon.dataset.lucide = "user-plus";
+      addFriendIcon.setAttribute("aria-hidden", "true");
+      addFriendButton.append(addFriendIcon);
+      addFriendButton.addEventListener("click", async () => {
+        addFriendButton.disabled = true;
         try {
           await api.addFriend(member.username);
           await loadFriends();
           member.canAddFriend = false;
           renderMembers();
         } catch (error) {
+          addFriendButton.disabled = false;
           handleError(error);
         }
       });
+      friendAction.append(addFriendButton);
     }
-    row.append(createAvatar(member.username, member.profileImageKey), createElement("span", "", member.username), action);
+    row.append(
+      createAvatar(member.username, member.profileImageKey),
+      createElement("span", "cw-member-name", member.username),
+      friendAction,
+      createElement("span", "cw-member-role text-small text-muted", member.chatRoomUserRole)
+    );
     dom.memberList.append(row);
   });
   dom.detailTitle.textContent = `참여자 ${state.members.length}명`;
@@ -1113,10 +1127,11 @@ const bindEvents = () => {
   });
 
   $("#cw-name-button").addEventListener("click", () => {
-    closeDetails();
-    dom.namePopover.hidden = !dom.namePopover.hidden;
+    closeDialogs();
+    dom.namePopover.hidden = false;
+    $("#cw-name-button").setAttribute("aria-expanded", "true");
   });
-  $("#cw-name-close").addEventListener("click", () => { dom.namePopover.hidden = true; });
+  $("#cw-name-close").addEventListener("click", closeDialogs);
   $("#cw-edit-base-name").addEventListener("click", () => openEditDialog("base"));
   $("#cw-edit-custom-name").addEventListener("click", () => openEditDialog("custom"));
   $("#cw-edit-my-name").addEventListener("click", () => openEditDialog("me"));

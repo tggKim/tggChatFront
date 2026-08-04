@@ -17,7 +17,7 @@
         <header class="cw-sidebar-header">
           <span class="cw-sidebar-title" id="cw-sidebar-title">채팅</span>
           <button type="button" class="btn btn-ghost cw-icon-button" id="cw-new-chat-button" aria-label="새 채팅방" data-tooltip="새 채팅방">
-            <i data-lucide="square-pen" aria-hidden="true"></i>
+            <i data-lucide="plus" aria-hidden="true"></i>
           </button>
           <button type="button" class="btn btn-ghost cw-icon-button" id="cw-add-friend-button" aria-label="친구 추가" data-tooltip="친구 추가" hidden>
             <i data-lucide="user-plus" aria-hidden="true"></i>
@@ -102,9 +102,30 @@
           </form>
         </div>
 
-        <section class="card cw-name-popover" id="cw-name-popover" aria-label="채팅방 이름 편집" hidden>
+        <aside class="cw-detail-panel" id="cw-detail-panel" aria-label="참여자 상세정보" hidden>
+          <div class="cw-detail-header">
+            <span class="cw-sidebar-title" id="cw-detail-title">참여자</span>
+            <div class="cw-detail-actions">
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-button" aria-label="사용자 초대" data-tooltip="사용자 초대">
+                <i data-lucide="plus" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-button" aria-label="채팅방 이름 편집" aria-expanded="false" data-tooltip="이름 편집">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-close" aria-label="상세정보 닫기" data-tooltip="상세정보 닫기">
+                <i data-lucide="x" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+          <div class="cw-member-list" id="cw-member-list"></div>
+          <button type="button" class="btn btn-danger btn-block cw-leave-button" id="cw-leave-button">채팅방 나가기</button>
+        </aside>
+      </section>
+
+      <div class="cw-dialog-backdrop" id="cw-name-popover" hidden>
+        <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-name-dialog-title">
           <div class="cw-popover-header">
-            <span class="cw-sidebar-title">이름 설정</span>
+            <span class="cw-sidebar-title" id="cw-name-dialog-title">이름 설정</span>
             <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-close" aria-label="이름 편집 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
           </div>
           <div class="cw-current-name">
@@ -130,26 +151,7 @@
             </button>
           </div>
         </section>
-
-        <aside class="cw-detail-panel" id="cw-detail-panel" aria-label="참여자 상세정보" hidden>
-          <div class="cw-detail-header">
-            <span class="cw-sidebar-title" id="cw-detail-title">참여자</span>
-            <div class="cw-detail-actions">
-              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-button" aria-label="사용자 초대" data-tooltip="사용자 초대">
-                <i data-lucide="plus" aria-hidden="true"></i>
-              </button>
-              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-button" aria-label="채팅방 이름 편집" aria-expanded="false" data-tooltip="이름 편집">
-                <i data-lucide="pencil" aria-hidden="true"></i>
-              </button>
-              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-close" aria-label="상세정보 닫기" data-tooltip="상세정보 닫기">
-                <i data-lucide="x" aria-hidden="true"></i>
-              </button>
-            </div>
-          </div>
-          <div class="cw-member-list" id="cw-member-list"></div>
-          <button type="button" class="btn btn-danger btn-block cw-leave-button" id="cw-leave-button">채팅방 나가기</button>
-        </aside>
-      </section>
+      </div>
 
       <div class="cw-dialog-backdrop" id="cw-friend-add-dialog" hidden>
         <form class="card cw-dialog" id="cw-friend-add-form" role="dialog" aria-modal="true" aria-labelledby="cw-friend-add-title">

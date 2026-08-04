@@ -663,20 +663,6 @@
       background: var(--card);
     }
 
-    #chat-layout-wireframe .cw-name-popover {
-      position: absolute;
-      z-index: 3;
-      top: 58px;
-      right: 52px;
-      width: min(330px, calc(100% - 24px));
-      padding: 14px;
-      opacity: 1;
-      background: linear-gradient(var(--popover), var(--popover)), var(--background);
-      color: var(--popover-foreground);
-      border: 1px solid var(--border);
-    }
-
-    #chat-layout-wireframe .cw-name-popover[hidden],
     #chat-layout-wireframe .cw-detail-panel[hidden] {
       display: none;
     }
@@ -767,11 +753,30 @@
 
     #chat-layout-wireframe .cw-member-row {
       display: grid;
-      grid-template-columns: 34px minmax(0, 1fr) auto;
+      grid-template-columns: 34px minmax(0, 1fr) 38px 56px;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       padding: 8px 0;
       border-bottom: 1px solid var(--border);
+    }
+
+    #chat-layout-wireframe .cw-member-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #chat-layout-wireframe .cw-member-friend-action {
+      display: flex;
+      width: 38px;
+      justify-content: center;
+    }
+
+    #chat-layout-wireframe .cw-member-role {
+      width: 56px;
+      text-align: right;
+      white-space: nowrap;
     }
 
     #chat-layout-wireframe .cw-dialog-backdrop {
