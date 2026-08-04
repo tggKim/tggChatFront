@@ -735,14 +735,23 @@ const loadOlderMessages = async () => {
   }
 };
 
-const scheduleRead = () => {
+const canMarkMessagesAsRead = () =>
+  document.visibilityState === "visible" && document.hasFocus();
+
+const cancelScheduledRead = () => {
   clearTimeout(state.readTimer);
+  state.readTimer = null;
+};
+
+const scheduleRead = () => {
+  cancelScheduledRead();
   const roomId = state.selectedRoomId;
   const latestMessageId = state.messages.at(-1)?.messageId;
-  if (!roomId || latestMessageId == null) return;
+  if (!roomId || latestMessageId == null || !canMarkMessagesAsRead()) return;
 
   state.readTimer = setTimeout(() => {
-    if (state.selectedRoomId !== roomId) return;
+    state.readTimer = null;
+    if (state.selectedRoomId !== roomId || !canMarkMessagesAsRead()) return;
     try {
       socket.sendRead(roomId, latestMessageId);
     } catch (error) {
@@ -974,6 +983,16 @@ const socket = new ChatSocket({
 });
 
 const bindEvents = () => {
+  window.addEventListener("focus", scheduleRead);
+  window.addEventListener("blur", cancelScheduledRead);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      scheduleRead();
+    } else {
+      cancelScheduledRead();
+    }
+  });
+
   window.addEventListener("pageshow", (event) => {
     if (!getAccessToken() && (event.persisted || !state.authenticationFailureHandled)) {
       showLoginRequired();
