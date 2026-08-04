@@ -4,6 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TGG Chat</title>
+  <script>
+    (() => {
+      const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      const iPadDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+      const mobileDevice = navigator.userAgentData?.mobile === true || mobileUserAgent || iPadDesktopMode;
+      document.documentElement.classList.toggle("mobile-layout", mobileDevice);
+    })();
+  </script>
   <link rel="stylesheet" href="css/chat.css" />
   <script src="https://unpkg.com/lucide@0.468.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
@@ -81,7 +89,8 @@
                 <i data-lucide="users" aria-hidden="true"></i>
               </button>
               <button type="button" class="btn btn-ghost cw-icon-button cw-room-close-button" id="cw-room-close" aria-label="현재 채팅 닫기" data-tooltip="현재 채팅 닫기">
-                <i data-lucide="x" aria-hidden="true"></i>
+                <i class="cw-room-close-icon" data-lucide="x" aria-hidden="true"></i>
+                <i class="cw-room-back-icon" data-lucide="arrow-left" aria-hidden="true"></i>
               </button>
             </div>
           </header>

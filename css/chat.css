@@ -552,6 +552,10 @@
       margin-left: 4px;
     }
 
+    #chat-layout-wireframe .cw-room-back-icon {
+      display: none;
+    }
+
     #chat-layout-wireframe .cw-icon-button {
       width: 38px;
       height: 38px;
@@ -875,4 +879,93 @@
       #chat-layout-wireframe .cw-messages {
         padding: 14px;
       }
+    }
+
+    html.mobile-layout {
+      overflow: hidden;
+    }
+
+    html.mobile-layout body {
+      min-width: 0;
+      height: 100dvh;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    html.mobile-layout .app-container {
+      height: 100dvh;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-shell {
+      grid-template-columns: minmax(0, 1fr);
+      border: 0;
+      border-radius: 0;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-main {
+      display: none;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-shell.is-room-open .cw-sidebar {
+      display: none;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-shell.is-room-open .cw-main {
+      display: block;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-room-header {
+      display: grid;
+      grid-template-columns: 38px auto minmax(0, 1fr) 38px;
+      gap: 8px;
+      padding-inline: 10px;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-room-header > .cw-avatar-stack {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-room-header-copy {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-header-actions {
+      display: contents;
+    }
+
+    html.mobile-layout #chat-layout-wireframe #cw-detail-button {
+      grid-column: 4;
+      grid-row: 1;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-room-close-button {
+      grid-column: 1;
+      grid-row: 1;
+      margin-left: 0;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-room-close-icon {
+      display: none;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-room-back-icon {
+      display: block;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-messages {
+      padding: 14px 12px;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-message-body {
+      max-width: min(82%, 430px);
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-composer {
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-detail-panel {
+      inset: 66px 0 calc(59px + env(safe-area-inset-bottom)) auto;
     }

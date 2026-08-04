@@ -36,6 +36,7 @@ const state = {
 };
 
 const dom = {
+  shell: $(".cw-shell"),
   sidebarTitle: $("#cw-sidebar-title"),
   chatList: $("#cw-chat-list-view"),
   friendList: $("#cw-friend-list-view"),
@@ -269,6 +270,7 @@ const renderCurrentUser = () => {
 const renderRoomHeader = () => {
   const room = state.rooms.get(state.selectedRoomId);
   const hasRoom = Boolean(room);
+  dom.shell.classList.toggle("is-room-open", hasRoom);
   dom.emptyRoom.hidden = hasRoom;
   dom.activeRoom.hidden = !hasRoom;
   if (!room) return;
@@ -1217,6 +1219,10 @@ const bindEvents = () => {
 
 const bootstrap = async () => {
   bindEvents();
+  if (document.documentElement.classList.contains("mobile-layout")) {
+    $("#cw-room-close").setAttribute("aria-label", "채팅방 목록으로 돌아가기");
+    $("#cw-room-close").dataset.tooltip = "채팅방 목록으로 돌아가기";
+  }
   if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
 
   if (!getAccessToken()) {
