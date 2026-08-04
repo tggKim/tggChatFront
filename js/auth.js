@@ -2,6 +2,7 @@
   const API_BASE_URL = ["localhost", "127.0.0.1"].includes(window.location.hostname)
     ? "http://localhost:8080"
     : "";
+  const LOGIN_EVENT_KEY = "tggChatLoginEvent";
 
   const loginForm = document.getElementById("login-form");
   const signupForm = document.getElementById("signup-form");
@@ -123,6 +124,8 @@
       });
 
       sessionStorage.setItem("accessToken", responseBody.accessToken);
+      const loginEventId = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      localStorage.setItem(LOGIN_EVENT_KEY, loginEventId);
       window.location.replace("chat.html");
     } catch (error) {
       showError(error.message);

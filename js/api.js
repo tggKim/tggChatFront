@@ -3,6 +3,8 @@ const API_BASE_URL = ["localhost", "127.0.0.1"].includes(window.location.hostnam
   : "";
 
 let refreshPromise = null;
+let sessionInvalidated = false;
+const sessionAbortController = new AbortController();
 
 export class ApiError extends Error {
   constructor(message, status = 0, code = null) {
@@ -19,12 +21,50 @@ export const getAccessToken = () => sessionStorage.getItem("accessToken");
 
 export const clearAccessToken = () => sessionStorage.removeItem("accessToken");
 
+export const invalidateSession = () => {
+  if (sessionInvalidated) return;
+  sessionInvalidated = true;
+  clearAccessToken();
+  sessionAbortController.abort();
+};
+
+const throwIfSessionInvalidated = () => {
+  if (!sessionInvalidated) return;
+  const error = new Error("현재 페이지의 로그인 세션이 종료되었습니다.");
+  error.name = "AbortError";
+  throw error;
+};
+
+const createRequestSignal = (externalSignal) => {
+  if (!externalSignal) {
+    return { signal: sessionAbortController.signal, cleanup: () => {} };
+  }
+
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  externalSignal.addEventListener("abort", abort, { once: true });
+  sessionAbortController.signal.addEventListener("abort", abort, { once: true });
+
+  if (externalSignal.aborted || sessionAbortController.signal.aborted) {
+    controller.abort();
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      externalSignal.removeEventListener("abort", abort);
+      sessionAbortController.signal.removeEventListener("abort", abort);
+    }
+  };
+};
+
 const parseResponse = async (response) => {
   const contentType = response.headers.get("content-type") || "";
   return contentType.includes("application/json") ? response.json() : null;
 };
 
 const refreshAccessToken = async () => {
+  throwIfSessionInvalidated();
   if (refreshPromise) {
     return refreshPromise;
   }
@@ -35,13 +75,16 @@ const refreshAccessToken = async () => {
     try {
       response = await fetch(`${API_BASE_URL}/refresh`, {
         method: "POST",
-        credentials: "include"
+        credentials: "include",
+        signal: sessionAbortController.signal
       });
-    } catch {
+    } catch (error) {
+      if (error.name === "AbortError") throw error;
       throw new ApiError("서버에 연결할 수 없습니다.");
     }
 
     const body = await parseResponse(response);
+    throwIfSessionInvalidated();
     if (!response.ok || !body?.accessToken) {
       clearAccessToken();
       throw new ApiError(body?.message || "로그인이 만료되었습니다.", response.status, body?.code);
@@ -69,10 +112,16 @@ const decodeExpiration = (token) => {
 };
 
 export const ensureAccessToken = async () => {
+  throwIfSessionInvalidated();
   const token = getAccessToken();
-  const expiresAt = token ? decodeExpiration(token) * 1000 : 0;
 
-  if (token && expiresAt > Date.now() + 30_000) {
+  if (!token) {
+    throw new ApiError("로그인이 필요합니다.", 401);
+  }
+
+  const expiresAt = decodeExpiration(token) * 1000;
+
+  if (expiresAt > Date.now() + 30_000) {
     return token;
   }
 
@@ -80,39 +129,50 @@ export const ensureAccessToken = async () => {
 };
 
 export const request = async (path, options = {}, retryAfterRefresh = true) => {
+  throwIfSessionInvalidated();
   const token = options.auth === false ? null : await ensureAccessToken();
-  let response;
+  throwIfSessionInvalidated();
+  const requestSignal = createRequestSignal(options.signal);
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      method: options.method || "GET",
-      credentials: "include",
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-      headers: {
-        ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers
+    let response;
+
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        method: options.method || "GET",
+        credentials: "include",
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: requestSignal.signal,
+        headers: {
+          ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...options.headers
+        }
+      });
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw error;
       }
-    });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw error;
+      throw new ApiError("서버에 연결할 수 없습니다.");
     }
-    throw new ApiError("서버에 연결할 수 없습니다.");
-  }
 
-  if (response.status === 401 && retryAfterRefresh && options.auth !== false) {
-    await refreshAccessToken();
-    return request(path, options, false);
-  }
+    throwIfSessionInvalidated();
 
-  const body = await parseResponse(response);
-  if (!response.ok) {
-    throw new ApiError(body?.message || "요청을 처리하는 중 오류가 발생했습니다.", response.status, body?.code);
-  }
+    if (response.status === 401 && retryAfterRefresh && options.auth !== false) {
+      await refreshAccessToken();
+      return request(path, options, false);
+    }
 
-  return body;
+    const body = await parseResponse(response);
+    throwIfSessionInvalidated();
+    if (!response.ok) {
+      throw new ApiError(body?.message || "요청을 처리하는 중 오류가 발생했습니다.", response.status, body?.code);
+    }
+
+    return body;
+  } finally {
+    requestSignal.cleanup();
+  }
 };
 
 export const api = {

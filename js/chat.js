@@ -1,5 +1,7 @@
-import { api, clearAccessToken } from "./api.js";
+import { api, clearAccessToken, getAccessToken, invalidateSession } from "./api.js";
 import { ChatSocket } from "./socket.js";
+
+const LOGIN_EVENT_KEY = "tggChatLoginEvent";
 
 const root = document.getElementById("chat-layout-wireframe");
 const $ = (selector) => root.querySelector(selector);
@@ -29,7 +31,8 @@ const state = {
   hasOlderMessages: false,
   loadingOlderMessages: false,
   hasConnected: false,
-  authenticationFailureHandled: false
+  authenticationFailureHandled: false,
+  sessionInvalidated: false
 };
 
 const dom = {
@@ -384,11 +387,54 @@ const isAuthenticationError = (error) => {
     || (typeof code === "string" && (/^J00[1-8]$/.test(code) || code === "W001"));
 };
 
-const handleAuthenticationFailure = () => {
-  if (state.authenticationFailureHandled) return;
+const showLoginRequired = () => {
   state.authenticationFailureHandled = true;
   Promise.resolve(socket.disconnect()).catch(() => {});
   showMessage("로그인이 필요합니다.", redirectToLogin);
+};
+
+const handleAuthenticationFailure = () => {
+  if (state.authenticationFailureHandled) return;
+  showLoginRequired();
+};
+
+const handleOtherTabLogin = () => {
+  if (state.sessionInvalidated) return;
+  state.sessionInvalidated = true;
+  state.authenticationFailureHandled = true;
+  invalidateSession();
+
+  clearTimeout(state.readTimer);
+  clearTimeout(state.membershipRefreshTimer);
+  state.readTimer = null;
+  state.membershipRefreshTimer = null;
+  state.roomAbortController?.abort();
+  state.roomAbortController = null;
+  state.roomLoadVersion += 1;
+  state.membershipRefreshVersion += 1;
+  state.detailLoadVersion += 1;
+  state.me = null;
+  state.friends = [];
+  state.rooms.clear();
+  state.selectedRoomId = null;
+  state.messages = [];
+  state.readStates.clear();
+  state.members = [];
+  state.selectedFriend = null;
+  state.editTarget = null;
+  state.roomListSyncing = false;
+  state.roomListSyncPromise = null;
+  state.pendingRoomListEvents = [];
+  state.roomSyncing = false;
+  state.pendingRoomEvents = [];
+  state.hasOlderMessages = false;
+  state.loadingOlderMessages = false;
+  state.hasConnected = false;
+
+  closeDetails();
+  closeDialogs();
+  Promise.resolve(socket.disconnect()).catch(() => {});
+  showMessage("다른 탭에서 로그인되어 로그아웃되었습니다.", redirectToLogin);
 };
 
 const handleError = (error) => {
@@ -560,6 +606,7 @@ const applyRoomListEvent = (event, snapshotRoom = null) => {
 };
 
 const handleRoomListEvent = (event) => {
+  if (state.sessionInvalidated) return;
   if (state.roomListSyncing) {
     state.pendingRoomListEvents.push(event);
     return;
@@ -596,6 +643,7 @@ const applyRoomEvent = (event, snapshotMessageId = null) => {
 };
 
 const handleRoomEvent = (event) => {
+  if (state.sessionInvalidated) return;
   if (state.roomSyncing && toNumber(event.roomId) === state.selectedRoomId) {
     state.pendingRoomEvents.push(event);
     return;
@@ -885,6 +933,7 @@ const selectSidebarTab = (tab) => {
 };
 
 const handleSocketConnected = async () => {
+  if (state.sessionInvalidated) return;
   const firstConnection = !state.hasConnected;
   const reconnectingRoomId = firstConnection ? null : state.selectedRoomId;
   if (reconnectingRoomId != null) {
@@ -925,6 +974,18 @@ const socket = new ChatSocket({
 });
 
 const bindEvents = () => {
+  window.addEventListener("pageshow", (event) => {
+    if (!getAccessToken() && (event.persisted || !state.authenticationFailureHandled)) {
+      showLoginRequired();
+    }
+  });
+
+  window.addEventListener("storage", (event) => {
+    if (event.storageArea === localStorage && event.key === LOGIN_EVENT_KEY && event.newValue) {
+      handleOtherTabLogin();
+    }
+  });
+
   Object.entries(sidebarTabs).forEach(([tab, button]) => button.addEventListener("click", () => selectSidebarTab(tab)));
   dom.newChatButton.addEventListener("click", openNewChatDialog);
   dom.addFriendButton.addEventListener("click", () => {
@@ -1114,6 +1175,11 @@ const bindEvents = () => {
 const bootstrap = async () => {
   bindEvents();
   if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+
+  if (!getAccessToken()) {
+    showLoginRequired();
+    return;
+  }
 
   try {
     state.me = await api.getMe();
