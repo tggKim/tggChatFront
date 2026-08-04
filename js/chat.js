@@ -128,7 +128,7 @@ const formatActivityTime = (value) => {
   if (Number.isNaN(date.getTime())) return "";
   const today = new Date();
   if (date.toDateString() === today.toDateString()) {
-    return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(date);
+    return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true }).format(date);
   }
   return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
 };
