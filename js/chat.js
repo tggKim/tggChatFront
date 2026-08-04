@@ -986,7 +986,16 @@ const bindEvents = () => {
     }
   });
 
-  Object.entries(sidebarTabs).forEach(([tab, button]) => button.addEventListener("click", () => selectSidebarTab(tab)));
+  Object.entries(sidebarTabs).forEach(([tab, button]) => button.addEventListener("click", async () => {
+    selectSidebarTab(tab);
+    if (tab !== "friends") return;
+
+    try {
+      await loadFriends();
+    } catch (error) {
+      handleError(error);
+    }
+  }));
   dom.newChatButton.addEventListener("click", openNewChatDialog);
   dom.addFriendButton.addEventListener("click", () => {
     closeDialogs();
