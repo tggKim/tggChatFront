@@ -128,9 +128,9 @@ const formatActivityTime = (value) => {
   if (Number.isNaN(date.getTime())) return "";
   const today = new Date();
   if (date.toDateString() === today.toDateString()) {
-    return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+    return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(date);
   }
-  return new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
 };
 
 const formatMessageTime = (value) => {
@@ -138,6 +138,25 @@ const formatMessageTime = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(date);
+};
+
+const messageDateKey = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const formatMessageDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long"
+  }).format(date);
 };
 
 const normalizePreviewUsers = (users) => Array.isArray(users)
@@ -312,7 +331,15 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
     return;
   }
 
+  let previousMessageDateKey = null;
+
   state.messages.forEach((message) => {
+    const currentMessageDateKey = messageDateKey(message.createdAt);
+    if (currentMessageDateKey && currentMessageDateKey !== previousMessageDateKey) {
+      dom.messages.append(createElement("div", "cw-system-message", formatMessageDate(message.createdAt)));
+      previousMessageDateKey = currentMessageDateKey;
+    }
+
     if (message.chatMessageType === "JOIN_TEXT" || message.chatMessageType === "LEAVE_TEXT") {
       const system = createElement("div", "cw-system-message", message.content);
       system.append(createElement("span", "cw-system-time", formatMessageTime(message.createdAt)));
