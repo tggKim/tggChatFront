@@ -122,22 +122,22 @@ const displayRoomName = (room) => {
   return room.roomType === "DIRECT" ? "?" : "";
 };
 
+const formatMessageTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(date);
+};
+
 const formatActivityTime = (value) => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const today = new Date();
   if (date.toDateString() === today.toDateString()) {
-    return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true }).format(date);
+    return formatMessageTime(value);
   }
   return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
-};
-
-const formatMessageTime = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(date);
 };
 
 const messageDateKey = (value) => {
