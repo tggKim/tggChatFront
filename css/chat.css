@@ -548,6 +548,10 @@
       gap: 4px;
     }
 
+    #chat-layout-wireframe .cw-room-close-button {
+      margin-left: 4px;
+    }
+
     #chat-layout-wireframe .cw-icon-button {
       width: 38px;
       height: 38px;
@@ -686,6 +690,12 @@
       margin-bottom: 12px;
     }
 
+    #chat-layout-wireframe .cw-detail-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
     #chat-layout-wireframe .cw-field + .cw-field {
       margin-top: 12px;
     }
@@ -740,9 +750,10 @@
     #chat-layout-wireframe .cw-detail-panel {
       position: absolute;
       z-index: 2;
-      inset: 66px 0 0 auto;
+      inset: 66px 0 59px auto;
       width: min(330px, 78%);
       padding: 16px;
+      overflow-y: auto;
       border-left: 1px solid var(--border);
       opacity: 1;
       background: linear-gradient(var(--popover), var(--popover)), var(--background);

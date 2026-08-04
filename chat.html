@@ -77,14 +77,11 @@
               <div class="cw-member-count text-small" id="cw-room-header-count"></div>
             </div>
             <div class="cw-header-actions">
-              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-button" aria-label="사용자 초대" data-tooltip="사용자 초대">
-                <i data-lucide="plus" aria-hidden="true"></i>
-              </button>
-              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-button" aria-label="채팅방 이름 편집" aria-expanded="false" data-tooltip="이름 편집">
-                <i data-lucide="pencil" aria-hidden="true"></i>
-              </button>
               <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-button" aria-label="참여자 상세정보" aria-expanded="false" data-tooltip="참여자 정보">
                 <i data-lucide="users" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button cw-room-close-button" id="cw-room-close" aria-label="현재 채팅 닫기" data-tooltip="현재 채팅 닫기">
+                <i data-lucide="x" aria-hidden="true"></i>
               </button>
             </div>
           </header>
@@ -137,7 +134,17 @@
         <aside class="cw-detail-panel" id="cw-detail-panel" aria-label="참여자 상세정보" hidden>
           <div class="cw-detail-header">
             <span class="cw-sidebar-title" id="cw-detail-title">참여자</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-close" aria-label="상세정보 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+            <div class="cw-detail-actions">
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-invite-button" aria-label="사용자 초대" data-tooltip="사용자 초대">
+                <i data-lucide="plus" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-name-button" aria-label="채팅방 이름 편집" aria-expanded="false" data-tooltip="이름 편집">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-ghost cw-icon-button" id="cw-detail-close" aria-label="상세정보 닫기" data-tooltip="상세정보 닫기">
+                <i data-lucide="x" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
           <div class="cw-member-list" id="cw-member-list"></div>
           <button type="button" class="btn btn-danger btn-block cw-leave-button" id="cw-leave-button">채팅방 나가기</button>

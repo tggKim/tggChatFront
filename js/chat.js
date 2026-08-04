@@ -482,22 +482,42 @@ const eventWasIncludedInSnapshot = (event, snapshotRoom) => {
   return snapshotRoom.messageId != null && eventMessageId <= snapshotRoom.messageId;
 };
 
+const closeDetails = () => {
+  if (!dom.detailPanel.hidden) state.detailLoadVersion += 1;
+  dom.detailPanel.hidden = true;
+  $("#cw-detail-button").setAttribute("aria-expanded", "false");
+};
+
+const closeActiveRoom = () => {
+  if (state.selectedRoomId == null) return;
+
+  clearTimeout(state.readTimer);
+  clearTimeout(state.membershipRefreshTimer);
+  state.readTimer = null;
+  state.membershipRefreshTimer = null;
+  state.roomAbortController?.abort();
+  state.roomAbortController = null;
+  state.roomLoadVersion += 1;
+  state.membershipRefreshVersion += 1;
+  state.selectedRoomId = null;
+  state.messages = [];
+  state.readStates.clear();
+  state.members = [];
+  state.roomSyncing = false;
+  state.pendingRoomEvents = [];
+  state.hasOlderMessages = false;
+  state.loadingOlderMessages = false;
+  socket.unsubscribeRoom();
+  closeDetails();
+  dom.namePopover.hidden = true;
+  renderRoomList();
+  renderRoomHeader();
+};
+
 const removeRoom = (roomId) => {
   state.rooms.delete(roomId);
   if (state.selectedRoomId === roomId) {
-    clearTimeout(state.membershipRefreshTimer);
-    state.membershipRefreshVersion += 1;
-    state.selectedRoomId = null;
-    state.messages = [];
-    state.readStates.clear();
-    state.members = [];
-    state.detailLoadVersion += 1;
-    state.hasOlderMessages = false;
-    state.loadingOlderMessages = false;
-    socket.unsubscribeRoom();
-    dom.detailPanel.hidden = true;
-    dom.namePopover.hidden = true;
-    renderRoomHeader();
+    closeActiveRoom();
   }
 };
 
@@ -627,7 +647,7 @@ const openRoom = async (roomId) => {
   state.messages = [];
   state.readStates.clear();
   state.members = [];
-  dom.detailPanel.hidden = true;
+  closeDetails();
   dom.namePopover.hidden = true;
   state.hasOlderMessages = false;
   state.loadingOlderMessages = false;
@@ -807,6 +827,7 @@ const openDetails = async () => {
   const version = ++state.detailLoadVersion;
   dom.namePopover.hidden = true;
   dom.detailPanel.hidden = false;
+  $("#cw-detail-button").setAttribute("aria-expanded", "true");
   dom.memberList.replaceChildren(createElement("div", "cw-list-state", "참여자를 불러오는 중입니다."));
   try {
     const members = await api.getRoomMembers(roomId);
@@ -815,7 +836,7 @@ const openDetails = async () => {
     renderMembers();
   } catch (error) {
     if (state.selectedRoomId !== roomId || state.detailLoadVersion !== version) return;
-    dom.detailPanel.hidden = true;
+    closeDetails();
     handleError(error);
   }
 };
@@ -834,7 +855,7 @@ const openEditDialog = (target) => {
 const openLeaveDialog = () => {
   const room = state.rooms.get(state.selectedRoomId);
   if (!room) return;
-  dom.detailPanel.hidden = true;
+  closeDetails();
   const candidates = state.members.filter((member) => member.userId !== state.me.userId);
   const needsNextOwner = room.myRole === "OWNER" && candidates.length > 0;
   $("#cw-next-owner-field").hidden = !needsNextOwner;
@@ -1003,7 +1024,7 @@ const bindEvents = () => {
   });
 
   $("#cw-name-button").addEventListener("click", () => {
-    dom.detailPanel.hidden = true;
+    closeDetails();
     dom.namePopover.hidden = !dom.namePopover.hidden;
   });
   $("#cw-name-close").addEventListener("click", () => { dom.namePopover.hidden = true; });
@@ -1034,9 +1055,11 @@ const bindEvents = () => {
   });
 
   $("#cw-detail-button").addEventListener("click", openDetails);
-  $("#cw-detail-close").addEventListener("click", () => {
-    state.detailLoadVersion += 1;
-    dom.detailPanel.hidden = true;
+  $("#cw-room-close").addEventListener("click", closeActiveRoom);
+  $("#cw-detail-close").addEventListener("click", closeDetails);
+  dom.activeRoom.addEventListener("click", (event) => {
+    if (event.target.closest(".cw-room-header")) return;
+    closeDetails();
   });
   $("#cw-leave-button").addEventListener("click", openLeaveDialog);
   $("#cw-leave-form").addEventListener("submit", async (event) => {
