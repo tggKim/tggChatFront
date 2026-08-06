@@ -133,6 +133,8 @@ export const request = async (path, options = {}, retryAfterRefresh = true) => {
   const token = options.auth === false ? null : await ensureAccessToken();
   throwIfSessionInvalidated();
   const requestSignal = createRequestSignal(options.signal);
+  const hasBody = options.body !== undefined;
+  const isFormData = options.body instanceof FormData;
 
   try {
     let response;
@@ -141,10 +143,10 @@ export const request = async (path, options = {}, retryAfterRefresh = true) => {
       response = await fetch(`${API_BASE_URL}${path}`, {
         method: options.method || "GET",
         credentials: "include",
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body: hasBody ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
         signal: requestSignal.signal,
         headers: {
-          ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...(!hasBody || isFormData ? {} : { "Content-Type": "application/json" }),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...options.headers
         }
@@ -178,6 +180,11 @@ export const request = async (path, options = {}, retryAfterRefresh = true) => {
 export const api = {
   getMe: () => request("/me"),
   updateMe: (username) => request("/me", { method: "PATCH", body: { username } }),
+  updateProfileImage: (profileImage) => {
+    const formData = new FormData();
+    formData.append("userProfileImage", profileImage);
+    return request("/me/profile-image", { method: "PUT", body: formData });
+  },
   logout: () => request("/logout", { method: "POST" }),
 
   getFriends: () => request("/friends"),

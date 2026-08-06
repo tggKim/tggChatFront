@@ -1231,7 +1231,27 @@ const bindEvents = () => {
   });
 
   $("#cw-file-button").addEventListener("click", () => showMessage("파일 전송 API는 아직 준비되지 않았습니다."));
-  $("#cw-profile-image-button").addEventListener("click", () => showMessage("프로필 이미지 수정 API는 아직 준비되지 않았습니다."));
+  $("#cw-profile-image-button").addEventListener("click", () => $("#cw-profile-image-input").click());
+  $("#cw-profile-image-input").addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+    const profileImage = input.files?.[0];
+    if (!profileImage) return;
+
+    const button = $("#cw-profile-image-button");
+    button.disabled = true;
+    try {
+      await api.updateProfileImage(profileImage);
+      state.me = await api.getMe();
+      state.me.userId = toNumber(state.me.userId);
+      renderCurrentUser();
+      showMessage("프로필 이미지를 변경했습니다.");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      input.value = "";
+      button.disabled = false;
+    }
+  });
   $("#cw-logout-button").addEventListener("click", async () => {
     try {
       await api.logout();
