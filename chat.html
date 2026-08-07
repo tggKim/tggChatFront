@@ -43,7 +43,7 @@
         <div class="cw-room-list cw-sidebar-view" id="cw-settings-view" hidden>
           <div class="cw-settings-profile">
             <div class="cw-profile-image-control">
-              <span class="cw-avatar cw-avatar-profile" id="cw-my-avatar" aria-label="현재 프로필 이미지">?</span>
+              <button type="button" class="cw-avatar cw-avatar-profile" id="cw-my-avatar" aria-label="현재 프로필 이미지"></button>
               <button type="button" class="btn btn-primary cw-icon-button cw-profile-camera-button" id="cw-profile-image-button" aria-label="프로필 이미지 수정" data-tooltip="프로필 이미지 수정">
                 <i class="cw-profile-camera-icon" data-lucide="camera" aria-hidden="true"></i>
               </button>
@@ -263,6 +263,16 @@
           <div class="cw-dialog-actions">
             <button type="button" class="btn btn-primary" id="cw-message-dialog-confirm">확인</button>
           </div>
+        </section>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-profile-image-dialog" hidden>
+        <section class="card cw-dialog cw-profile-image-dialog" role="dialog" aria-modal="true" aria-label="프로필 원본 이미지">
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title">프로필 이미지</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="프로필 이미지 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <img class="cw-profile-original-image" id="cw-profile-original-image" alt="내 프로필 원본 이미지" />
         </section>
       </div>
     </div>

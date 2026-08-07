@@ -1,4 +1,4 @@
-import { api, clearAccessToken, getAccessToken, invalidateSession } from "./api.js";
+import { api, clearAccessToken, getAccessToken, getApiBaseUrl, invalidateSession } from "./api.js";
 import { ChatSocket } from "./socket.js";
 
 const LOGIN_EVENT_KEY = "tggChatLoginEvent";
@@ -83,7 +83,8 @@ const createElement = (tag, className, text) => {
 
 const toNumber = (value) => value == null ? null : Number(value);
 
-const initial = (username) => username?.trim()?.[0] || "?";
+const profileImageUrl = (profileImageKey, variant) =>
+  `${getApiBaseUrl()}/profile-images/${encodeURIComponent(profileImageKey)}/${variant}`;
 
 const renderIcons = () => {
   if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
@@ -96,7 +97,16 @@ const setAvatar = (avatar, username, profileImageKey) => {
   if (profileImageKey) {
     avatar.dataset.profileImageKey = profileImageKey;
     avatar.classList.remove("cw-avatar-default");
-    avatar.textContent = initial(username);
+    const image = createElement("img", "cw-avatar-image");
+    image.src = profileImageUrl(profileImageKey, "thumbnail");
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.addEventListener("error", () => {
+      setAvatar(avatar, username, null);
+      renderIcons();
+    }, { once: true });
+    avatar.append(image);
     return avatar;
   }
 
@@ -1232,6 +1242,14 @@ const bindEvents = () => {
 
   $("#cw-file-button").addEventListener("click", () => showMessage("파일 전송 API는 아직 준비되지 않았습니다."));
   $("#cw-profile-image-button").addEventListener("click", () => $("#cw-profile-image-input").click());
+  $("#cw-my-avatar").addEventListener("click", () => {
+    const profileImageKey = state.me?.profileImageKey;
+    if (!profileImageKey) return;
+
+    const originalImage = $("#cw-profile-original-image");
+    originalImage.src = profileImageUrl(profileImageKey, "image");
+    $("#cw-profile-image-dialog").hidden = false;
+  });
   $("#cw-profile-image-input").addEventListener("change", async (event) => {
     const input = event.currentTarget;
     const profileImage = input.files?.[0];

@@ -472,6 +472,20 @@
       background: var(--secondary);
       color: var(--secondary-foreground);
       font-weight: 500;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    #chat-layout-wireframe .cw-avatar-image {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    #chat-layout-wireframe button.cw-avatar-profile {
+      cursor: pointer;
     }
 
     #chat-layout-wireframe .cw-avatar.cw-avatar-default {
@@ -866,6 +880,20 @@
 
     #chat-layout-wireframe .cw-profile-dialog-name {
       font-weight: 500;
+    }
+
+    #chat-layout-wireframe .cw-profile-image-dialog {
+      width: min(560px, 100%);
+    }
+
+    #chat-layout-wireframe .cw-profile-original-image {
+      width: 100%;
+      max-height: min(68vh, 560px);
+      display: block;
+      margin-top: 14px;
+      object-fit: contain;
+      background: var(--secondary);
+      border-radius: 6px;
     }
 
     #chat-layout-wireframe .cw-leave-button {
