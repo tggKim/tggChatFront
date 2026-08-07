@@ -2,6 +2,7 @@ import { api, clearAccessToken, getAccessToken, getApiBaseUrl, invalidateSession
 import { ChatSocket } from "./socket.js";
 
 const LOGIN_EVENT_KEY = "tggChatLoginEvent";
+const CREATED_ROOM_EVENT_TIMEOUT_MS = 5000;
 
 const root = document.getElementById("chat-layout-wireframe");
 const $ = (selector) => root.querySelector(selector);
@@ -20,6 +21,7 @@ const state = {
   roomListSyncing: false,
   roomListSyncPromise: null,
   pendingRoomListEvents: [],
+  pendingRoomOpens: new Map(),
   roomSyncing: false,
   pendingRoomEvents: [],
   roomLoadVersion: 0,
@@ -514,6 +516,7 @@ const isAuthenticationError = (error) => {
 
 const showLoginRequired = () => {
   state.authenticationFailureHandled = true;
+  cancelPendingRoomOpens();
   Promise.resolve(socket.disconnect()).catch(() => {});
   showMessage("로그인이 필요합니다.", redirectToLogin);
 };
@@ -550,6 +553,7 @@ const handleOtherTabLogin = () => {
   state.roomListSyncing = false;
   state.roomListSyncPromise = null;
   state.pendingRoomListEvents = [];
+  cancelPendingRoomOpens();
   state.roomSyncing = false;
   state.pendingRoomEvents = [];
   state.hasOlderMessages = false;
@@ -572,6 +576,7 @@ const handleError = (error) => {
 };
 
 const redirectToLogin = () => {
+  cancelPendingRoomOpens();
   clearAccessToken();
   window.location.replace("index.html");
 };
@@ -583,6 +588,65 @@ const loadFriends = async () => {
     profileImageKey: friend.profileImageKey ?? null
   }));
   renderFriendList();
+};
+
+const resolvePendingRoomOpen = (roomId) => {
+  const pending = state.pendingRoomOpens.get(roomId);
+  if (!pending) return;
+
+  clearTimeout(pending.timeoutId);
+  state.pendingRoomOpens.delete(roomId);
+  pending.resolve();
+};
+
+const resolveAvailableRoomOpens = () => {
+  [...state.pendingRoomOpens.keys()].forEach((roomId) => {
+    if (state.rooms.has(roomId)) resolvePendingRoomOpen(roomId);
+  });
+};
+
+const cancelPendingRoomOpens = () => {
+  state.pendingRoomOpens.forEach((pending) => {
+    clearTimeout(pending.timeoutId);
+    pending.reject(new DOMException("채팅방 입장 대기가 취소되었습니다.", "AbortError"));
+  });
+  state.pendingRoomOpens.clear();
+};
+
+const waitForRoom = (roomId) => {
+  if (state.rooms.has(roomId)) return Promise.resolve();
+
+  const existing = state.pendingRoomOpens.get(roomId);
+  if (existing) return existing.promise;
+
+  let resolvePromise;
+  let rejectPromise;
+  const promise = new Promise((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  const timeoutId = setTimeout(() => {
+    state.pendingRoomOpens.delete(roomId);
+    rejectPromise(new Error("채팅방은 생성되었지만 정보를 받지 못했습니다. 새로고침 후 확인해주세요."));
+  }, CREATED_ROOM_EVENT_TIMEOUT_MS);
+
+  state.pendingRoomOpens.set(roomId, {
+    promise,
+    resolve: resolvePromise,
+    reject: rejectPromise,
+    timeoutId
+  });
+  return promise;
+};
+
+const openCreatedRoom = async (value) => {
+  const roomId = toNumber(value);
+  if (roomId == null) throw new Error("채팅방 생성 응답이 올바르지 않습니다.");
+
+  closeDialogs();
+  selectSidebarTab("chats");
+  await waitForRoom(roomId);
+  await openRoom(roomId);
 };
 
 const syncRoomList = async () => {
@@ -605,6 +669,7 @@ const syncRoomList = async () => {
       const queuedEvents = state.pendingRoomListEvents;
       state.pendingRoomListEvents = [];
       queuedEvents.forEach((event) => applyRoomListEvent(event, snapshotRooms.get(toNumber(event.roomId))));
+      resolveAvailableRoomOpens();
       if (state.selectedRoomId != null && !state.rooms.has(state.selectedRoomId)) {
         removeRoom(state.selectedRoomId);
       }
@@ -699,6 +764,7 @@ const applyRoomListEvent = (event, snapshotRoom = null) => {
 
   if (event.eventType === "ROOM_ADDED") {
     if (!includedInSnapshot) state.rooms.set(roomId, normalizeRoom(event));
+    if (state.rooms.has(roomId)) resolvePendingRoomOpen(roomId);
   } else if (event.eventType === "ROOM_REMOVED") {
     removeRoom(roomId);
   } else {
@@ -1230,9 +1296,7 @@ const bindEvents = () => {
     setSubmitting(form, true);
     try {
       const result = await api.createGroupRoom(friendIds, $("#cw-group-name").value.trim());
-      closeDialogs();
-      await syncRoomList();
-      await openRoom(toNumber(result.chatRoomId));
+      await openCreatedRoom(result.chatRoomId);
     } catch (error) {
       handleError(error);
     } finally {
@@ -1249,10 +1313,7 @@ const bindEvents = () => {
     try {
       if (findFriendByUserId(user.userId)) {
         const result = await api.createDirectRoom(user.userId);
-        closeDialogs();
-        selectSidebarTab("chats");
-        await syncRoomList();
-        await openRoom(toNumber(result.chatRoomId));
+        await openCreatedRoom(result.chatRoomId);
       } else {
         await api.addFriend(user.username);
         await loadFriends();
