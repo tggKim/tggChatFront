@@ -488,6 +488,11 @@
       cursor: pointer;
     }
 
+    #chat-layout-wireframe button.cw-avatar-button {
+      cursor: pointer;
+      font: inherit;
+    }
+
     #chat-layout-wireframe .cw-avatar.cw-avatar-default {
       background: #e7e9ed;
       color: #68707d;
@@ -889,11 +894,29 @@
     #chat-layout-wireframe .cw-profile-original-image {
       width: 100%;
       max-height: min(68vh, 560px);
-      display: block;
+      display: grid;
+      place-items: center;
       margin-top: 14px;
-      object-fit: contain;
+      overflow: hidden;
       background: var(--secondary);
       border-radius: 6px;
+    }
+
+    #chat-layout-wireframe .cw-profile-original-image.cw-profile-original-default {
+      min-height: min(68vh, 420px);
+    }
+
+    #chat-layout-wireframe .cw-profile-original-image-content {
+      width: 100%;
+      max-height: min(68vh, 560px);
+      display: block;
+      object-fit: contain;
+    }
+
+    #chat-layout-wireframe .cw-profile-original-default-icon {
+      width: 96px;
+      height: 96px;
+      color: var(--muted-foreground);
     }
 
     #chat-layout-wireframe .cw-leave-button {

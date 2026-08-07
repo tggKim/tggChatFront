@@ -15,7 +15,7 @@ const state = {
   messages: [],
   readStates: new Map(),
   members: [],
-  selectedFriend: null,
+  selectedProfileUser: null,
   editTarget: null,
   roomListSyncing: false,
   roomListSyncPromise: null,
@@ -122,6 +122,14 @@ const setAvatar = (avatar, username, profileImageKey) => {
 const createAvatar = (username, profileImageKey, extraClass = "") => {
   const avatar = createElement("span", `cw-avatar ${extraClass}`.trim());
   return setAvatar(avatar, username, profileImageKey);
+};
+
+const createProfileAvatarButton = (user) => {
+  const avatar = createElement("button", "cw-avatar cw-avatar-button");
+  avatar.type = "button";
+  setAvatar(avatar, user.username, user.profileImageKey);
+  avatar.addEventListener("click", () => openUserProfile(user));
+  return avatar;
 };
 
 const displayRoomName = (room) => {
@@ -287,7 +295,7 @@ const renderFriendList = () => {
       createElement("span", "", friend.friendUsername),
       createElement("span")
     );
-    row.addEventListener("click", () => openFriendProfile(friend));
+    row.addEventListener("click", () => openUserProfile(friend));
     dom.friendList.append(row);
   });
   renderIcons();
@@ -364,7 +372,12 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
     const mine = message.senderId != null && message.senderId === state.me?.userId;
     const row = createElement("div", `cw-message-row${mine ? " mine" : ""}`);
     if (!mine) {
-      row.append(createAvatar(message.senderName, message.senderProfileImageKey));
+      const sender = {
+        userId: message.senderId,
+        username: message.senderName,
+        profileImageKey: message.senderProfileImageKey
+      };
+      row.append(createProfileAvatarButton(sender));
     }
 
     const body = createElement("div", "cw-message-body");
@@ -413,10 +426,52 @@ const closeMessage = () => {
   action?.();
 };
 
+const closeOriginalProfileImage = () => {
+  const dialog = $("#cw-profile-image-dialog");
+  dialog.hidden = true;
+  const imageContainer = $("#cw-profile-original-image");
+  imageContainer.replaceChildren();
+  imageContainer.classList.remove("cw-profile-original-default");
+  imageContainer.setAttribute("aria-label", "프로필 원본 이미지");
+};
+
+const openOriginalProfileImage = (profileImageKey, username) => {
+  const imageContainer = $("#cw-profile-original-image");
+  const displayName = username || "알 수 없는 사용자";
+  imageContainer.replaceChildren();
+
+  const showDefaultImage = () => {
+    imageContainer.replaceChildren();
+    imageContainer.classList.add("cw-profile-original-default");
+    imageContainer.setAttribute("aria-label", `${displayName} 기본 프로필 이미지`);
+    const icon = createElement("i", "cw-profile-original-default-icon");
+    icon.setAttribute("data-lucide", "user-round");
+    icon.setAttribute("aria-hidden", "true");
+    imageContainer.append(icon);
+    renderIcons();
+  };
+
+  if (profileImageKey) {
+    imageContainer.classList.remove("cw-profile-original-default");
+    imageContainer.setAttribute("aria-label", `${displayName} 프로필 원본 이미지`);
+    const image = createElement("img", "cw-profile-original-image-content");
+    image.src = profileImageUrl(profileImageKey, "image");
+    image.alt = `${displayName} 프로필 원본 이미지`;
+    image.addEventListener("error", showDefaultImage, { once: true });
+    imageContainer.append(image);
+  } else {
+    showDefaultImage();
+  }
+
+  $("#cw-profile-image-dialog").hidden = false;
+};
+
 const closeDialogs = () => {
   $$(".cw-dialog-backdrop").forEach((dialog) => {
     if (dialog !== dom.messageDialog) dialog.hidden = true;
   });
+  closeOriginalProfileImage();
+  state.selectedProfileUser = null;
   dom.namePopover.hidden = true;
   $("#cw-name-button").setAttribute("aria-expanded", "false");
 };
@@ -464,7 +519,7 @@ const handleOtherTabLogin = () => {
   state.messages = [];
   state.readStates.clear();
   state.members = [];
-  state.selectedFriend = null;
+  state.selectedProfileUser = null;
   state.editTarget = null;
   state.roomListSyncing = false;
   state.roomListSyncPromise = null;
@@ -857,11 +912,36 @@ const renderSelectableFriends = (container, friends, checkboxClass) => {
   renderIcons();
 };
 
-const openFriendProfile = (friend) => {
+const findFriendByUserId = (userId) =>
+  state.friends.find((friend) => friend.friendId === userId) ?? null;
+
+const renderUserProfileAction = () => {
+  const user = state.selectedProfileUser;
+  const actionButton = $("#cw-friend-profile-chat");
+  if (!user) return;
+
+  actionButton.hidden = user.userId == null || user.userId === state.me?.userId;
+  actionButton.textContent = findFriendByUserId(user.userId) ? "채팅하기" : "친구 추가";
+};
+
+const openUserProfile = (user) => {
+  const userId = toNumber(user.userId ?? user.friendId);
+
   closeDialogs();
-  state.selectedFriend = friend;
-  setAvatar($("#cw-friend-profile-avatar"), friend.friendUsername, friend.profileImageKey);
-  $("#cw-friend-profile-name").textContent = friend.friendUsername;
+  const friend = findFriendByUserId(userId);
+  state.selectedProfileUser = {
+    userId,
+    username: friend?.friendUsername ?? user.username ?? user.friendUsername ?? "알 수 없는 사용자",
+    profileImageKey: friend?.profileImageKey ?? user.profileImageKey ?? null
+  };
+
+  setAvatar(
+    $("#cw-friend-profile-avatar"),
+    state.selectedProfileUser.username,
+    state.selectedProfileUser.profileImageKey
+  );
+  $("#cw-friend-profile-name").textContent = state.selectedProfileUser.username;
+  renderUserProfileAction();
   $("#cw-friend-profile-dialog").hidden = false;
   renderIcons();
 };
@@ -1080,11 +1160,15 @@ const bindEvents = () => {
     $("#cw-friend-username").focus();
   });
   $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", closeDialogs));
+  $("[data-close-profile-image]").addEventListener("click", closeOriginalProfileImage);
   $$(".cw-dialog-backdrop").forEach((backdrop) => {
-    if (backdrop === dom.messageDialog) return;
+    if (backdrop === dom.messageDialog || backdrop.id === "cw-profile-image-dialog") return;
     backdrop.addEventListener("click", (event) => {
       if (event.target === backdrop) closeDialogs();
     });
+  });
+  $("#cw-profile-image-dialog").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closeOriginalProfileImage();
   });
   dom.messageDialogConfirm.addEventListener("click", closeMessage);
 
@@ -1130,16 +1214,28 @@ const bindEvents = () => {
     }
   });
 
-  $("#cw-friend-profile-chat").addEventListener("click", async () => {
-    if (!state.selectedFriend) return;
+  $("#cw-friend-profile-chat").addEventListener("click", async (event) => {
+    const user = state.selectedProfileUser;
+    if (!user) return;
+
+    const actionButton = event.currentTarget;
+    actionButton.disabled = true;
     try {
-      const result = await api.createDirectRoom(state.selectedFriend.friendId);
-      closeDialogs();
-      selectSidebarTab("chats");
-      await syncRoomList();
-      await openRoom(toNumber(result.chatRoomId));
+      if (findFriendByUserId(user.userId)) {
+        const result = await api.createDirectRoom(user.userId);
+        closeDialogs();
+        selectSidebarTab("chats");
+        await syncRoomList();
+        await openRoom(toNumber(result.chatRoomId));
+      } else {
+        await api.addFriend(user.username);
+        await loadFriends();
+        renderUserProfileAction();
+      }
     } catch (error) {
       handleError(error);
+    } finally {
+      actionButton.disabled = false;
     }
   });
 
@@ -1243,12 +1339,13 @@ const bindEvents = () => {
   $("#cw-file-button").addEventListener("click", () => showMessage("파일 전송 API는 아직 준비되지 않았습니다."));
   $("#cw-profile-image-button").addEventListener("click", () => $("#cw-profile-image-input").click());
   $("#cw-my-avatar").addEventListener("click", () => {
-    const profileImageKey = state.me?.profileImageKey;
-    if (!profileImageKey) return;
-
-    const originalImage = $("#cw-profile-original-image");
-    originalImage.src = profileImageUrl(profileImageKey, "image");
-    $("#cw-profile-image-dialog").hidden = false;
+    openOriginalProfileImage($("#cw-my-avatar").dataset.profileImageKey, state.me?.username);
+  });
+  $("#cw-friend-profile-avatar").addEventListener("click", () => {
+    openOriginalProfileImage(
+      $("#cw-friend-profile-avatar").dataset.profileImageKey,
+      state.selectedProfileUser?.username
+    );
   });
   $("#cw-profile-image-input").addEventListener("change", async (event) => {
     const input = event.currentTarget;
@@ -1282,7 +1379,12 @@ const bindEvents = () => {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeDialogs();
+    if (event.key !== "Escape") return;
+    if (!$("#cw-profile-image-dialog").hidden) {
+      closeOriginalProfileImage();
+      return;
+    }
+    closeDialogs();
   });
 };
 

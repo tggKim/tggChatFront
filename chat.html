@@ -199,11 +199,11 @@
       <div class="cw-dialog-backdrop" id="cw-friend-profile-dialog" hidden>
         <section class="card cw-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-friend-profile-title">
           <div class="cw-popover-header">
-            <span class="cw-sidebar-title" id="cw-friend-profile-title">친구 프로필</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="친구 프로필 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+            <span class="cw-sidebar-title" id="cw-friend-profile-title">사용자 프로필</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="사용자 프로필 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
           </div>
           <div class="cw-profile-dialog-body">
-            <span class="cw-avatar cw-avatar-profile" id="cw-friend-profile-avatar">?</span>
+            <button type="button" class="cw-avatar cw-avatar-profile" id="cw-friend-profile-avatar" aria-label="프로필 원본 이미지 보기"></button>
             <span class="cw-profile-dialog-name" id="cw-friend-profile-name"></span>
           </div>
           <button type="button" class="btn btn-primary btn-block" id="cw-friend-profile-chat">채팅하기</button>
@@ -270,9 +270,14 @@
         <section class="card cw-dialog cw-profile-image-dialog" role="dialog" aria-modal="true" aria-label="프로필 원본 이미지">
           <div class="cw-popover-header">
             <span class="cw-sidebar-title">프로필 이미지</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="프로필 이미지 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-profile-image aria-label="프로필 이미지 닫기"><i data-lucide="x" aria-hidden="true"></i></button>
           </div>
-          <img class="cw-profile-original-image" id="cw-profile-original-image" alt="내 프로필 원본 이미지" />
+          <div
+            class="cw-profile-original-image"
+            id="cw-profile-original-image"
+            role="img"
+            aria-label="프로필 원본 이미지"
+          ></div>
         </section>
       </div>
     </div>
