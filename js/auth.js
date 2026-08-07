@@ -98,11 +98,11 @@
 
   showSignupButton.addEventListener("click", () => {
     signupForm.reset();
-    signupEmailInput.value = loginEmailInput.value.trim();
     setView("signup");
   });
 
   showLoginButton.addEventListener("click", () => {
+    loginForm.reset();
     setView("login");
   });
 
