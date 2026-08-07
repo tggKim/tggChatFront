@@ -138,7 +138,11 @@ const displayRoomName = (room) => {
   if (room.customRoomName) return room.customRoomName;
   if (room.baseRoomName) return room.baseRoomName;
   const names = room.previewUsers.map((user) => user.username).filter(Boolean);
-  if (names.length) return names.join(", ");
+  if (names.length) {
+    const hiddenUserCount = Math.max(0, room.memberCount - 1 - room.previewUsers.length);
+    const visibleName = names.join(", ");
+    return hiddenUserCount > 0 ? `${visibleName} 외 ${hiddenUserCount}명` : visibleName;
+  }
   return room.roomType === "DIRECT" ? "?" : "";
 };
 
