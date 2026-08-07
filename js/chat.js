@@ -17,6 +17,7 @@ const state = {
   readStates: new Map(),
   members: [],
   selectedProfileUser: null,
+  refreshMembersOnProfileClose: false,
   editTarget: null,
   roomListSyncing: false,
   roomListSyncPromise: null,
@@ -499,13 +500,20 @@ const openOriginalProfileImage = (profileImageKey, username) => {
 };
 
 const closeDialogs = () => {
+  const shouldRefreshMembers = state.refreshMembersOnProfileClose
+    && !$("#cw-friend-profile-dialog").hidden
+    && !dom.detailPanel.hidden;
+
   $$(".cw-dialog-backdrop").forEach((dialog) => {
     if (dialog !== dom.messageDialog) dialog.hidden = true;
   });
   closeOriginalProfileImage();
   state.selectedProfileUser = null;
+  state.refreshMembersOnProfileClose = false;
   dom.namePopover.hidden = true;
   $("#cw-name-button").setAttribute("aria-expanded", "false");
+
+  if (shouldRefreshMembers) openDetails();
 };
 
 const setSubmitting = (form, submitting) => {
@@ -553,6 +561,7 @@ const handleOtherTabLogin = () => {
   state.readStates.clear();
   state.members = [];
   state.selectedProfileUser = null;
+  state.refreshMembersOnProfileClose = false;
   state.editTarget = null;
   state.roomListSyncing = false;
   state.roomListSyncPromise = null;
@@ -1024,6 +1033,7 @@ const openUserProfile = (user) => {
   const userId = toNumber(user.userId ?? user.friendId);
 
   closeDialogs();
+  state.refreshMembersOnProfileClose = false;
   const friend = findFriendByUserId(userId);
   state.selectedProfileUser = {
     userId,
@@ -1100,7 +1110,7 @@ const renderMembers = () => {
       friendAction.append(addFriendButton);
     }
     row.append(
-      createAvatar(member.username, member.profileImageKey),
+      createProfileAvatarButton(member),
       createElement("span", "cw-member-name", member.username),
       friendAction,
       createElement("span", "cw-member-role text-small text-muted", member.chatRoomUserRole)
@@ -1321,6 +1331,7 @@ const bindEvents = () => {
       } else {
         await api.addFriend(user.username);
         await loadFriends();
+        state.refreshMembersOnProfileClose = true;
         renderUserProfileAction();
       }
     } catch (error) {
