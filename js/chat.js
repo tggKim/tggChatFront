@@ -214,24 +214,50 @@ const normalizeMessage = (message) => ({
   createdAt: message.createdAt ?? null
 });
 
-const renderAvatarStack = (container, room, large = false) => {
+const renderAvatarStack = (container, room, large = false, opensDetails = false) => {
   container.replaceChildren();
   room.previewUsers.forEach((user) => {
-    container.append(createAvatar(user.username, user.profileImageKey, large ? "cw-avatar-large" : ""));
+    const extraClass = large ? "cw-avatar-large" : "";
+    if (!opensDetails) {
+      container.append(createAvatar(user.username, user.profileImageKey, extraClass));
+      return;
+    }
+
+    const avatar = createElement("button", `cw-avatar cw-avatar-button ${extraClass}`.trim());
+    avatar.type = "button";
+    setAvatar(avatar, user.username, user.profileImageKey);
+    avatar.setAttribute("aria-label", `${user.username || "알 수 없는 사용자"} 참여자 상세정보`);
+    avatar.addEventListener("click", openDetails);
+    container.append(avatar);
   });
 
   const hiddenUserCount = Math.max(0, room.memberCount - 1 - room.previewUsers.length);
   if (hiddenUserCount > 0) {
     const overflow = createElement(
-      "span",
-      `cw-avatar cw-avatar-overflow${large ? " cw-avatar-large" : ""}`,
+      opensDetails ? "button" : "span",
+      `cw-avatar cw-avatar-overflow${large ? " cw-avatar-large" : ""}${opensDetails ? " cw-avatar-button" : ""}`,
       `외${hiddenUserCount}`
     );
+    if (opensDetails) {
+      overflow.type = "button";
+      overflow.setAttribute("aria-label", `외 ${hiddenUserCount}명 참여자 상세정보`);
+      overflow.addEventListener("click", openDetails);
+    }
     container.append(overflow);
   }
 
   if (!container.childElementCount) {
-    container.append(createAvatar("?", null, large ? "cw-avatar-large" : ""));
+    const extraClass = large ? "cw-avatar-large" : "";
+    if (opensDetails) {
+      const avatar = createElement("button", `cw-avatar cw-avatar-button ${extraClass}`.trim());
+      avatar.type = "button";
+      setAvatar(avatar, "?", null);
+      avatar.setAttribute("aria-label", "참여자 상세정보");
+      avatar.addEventListener("click", openDetails);
+      container.append(avatar);
+    } else {
+      container.append(createAvatar("?", null, extraClass));
+    }
   }
   renderIcons();
 };
@@ -316,7 +342,7 @@ const renderRoomHeader = () => {
   dom.activeRoom.hidden = !hasRoom;
   if (!room) return;
 
-  renderAvatarStack(dom.headerAvatars, room, true);
+  renderAvatarStack(dom.headerAvatars, room, true, true);
   dom.headerName.textContent = displayRoomName(room);
   dom.headerCount.textContent = room.roomType === "GROUP" ? `${room.memberCount}명` : "";
   $("#cw-display-name-setting").textContent = displayRoomName(room);
