@@ -22,6 +22,8 @@ const state = {
   roomListSyncing: false,
   roomListSyncPromise: null,
   pendingRoomListEvents: [],
+  userMetadataSyncing: false,
+  pendingUserMetadataEvents: [],
   pendingRoomOpens: new Map(),
   roomSyncing: false,
   pendingRoomEvents: [],
@@ -566,6 +568,8 @@ const handleOtherTabLogin = () => {
   state.roomListSyncing = false;
   state.roomListSyncPromise = null;
   state.pendingRoomListEvents = [];
+  state.userMetadataSyncing = false;
+  state.pendingUserMetadataEvents = [];
   cancelPendingRoomOpens();
   state.roomSyncing = false;
   state.pendingRoomEvents = [];
@@ -696,6 +700,7 @@ const syncRoomList = async () => {
     } finally {
       state.roomListSyncing = false;
       state.roomListSyncPromise = null;
+      replayPendingUserMetadataEvents();
     }
   })();
 
@@ -855,6 +860,105 @@ const handleRoomEvent = (event) => {
   applyRoomEvent(event);
 };
 
+const patchUserMetadata = (target, event, usernameField, profileImageKeyField) => {
+  if (event.userMetadataEventType === "USERNAME_UPDATED") {
+    if (typeof event.username !== "string" || target[usernameField] === event.username) return false;
+    target[usernameField] = event.username;
+    return true;
+  }
+
+  if (event.userMetadataEventType === "USER_PROFILE_IMAGE_UPDATE") {
+    if (!Object.prototype.hasOwnProperty.call(event, "userProfileImageKey")) return false;
+    const nextProfileImageKey = event.userProfileImageKey ?? null;
+    if (target[profileImageKeyField] === nextProfileImageKey) return false;
+    target[profileImageKeyField] = nextProfileImageKey;
+    return true;
+  }
+
+  return false;
+};
+
+const applyUserMetadataEvent = (event) => {
+  const userId = toNumber(event.userId);
+  if (userId == null || userId === state.me?.userId) return;
+
+  let roomsChanged = false;
+  let selectedRoomChanged = false;
+  state.rooms.forEach((room) => {
+    let roomChanged = false;
+    room.previewUsers.forEach((previewUser) => {
+      if (toNumber(previewUser.userId) !== userId) return;
+      roomChanged = patchUserMetadata(previewUser, event, "username", "profileImageKey") || roomChanged;
+    });
+    roomsChanged = roomChanged || roomsChanged;
+    if (roomChanged && room.roomId === state.selectedRoomId) selectedRoomChanged = true;
+  });
+
+  let messagesChanged = false;
+  state.messages.forEach((message) => {
+    if (toNumber(message.senderId) !== userId) return;
+    messagesChanged = patchUserMetadata(
+      message,
+      event,
+      "senderName",
+      "senderProfileImageKey"
+    ) || messagesChanged;
+  });
+
+  let membersChanged = false;
+  state.members.forEach((member) => {
+    if (toNumber(member.userId) !== userId) return;
+    membersChanged = patchUserMetadata(member, event, "username", "profileImageKey") || membersChanged;
+  });
+  let friendsChanged = false;
+  state.friends.forEach((friend) => {
+    if (toNumber(friend.friendId) !== userId) return;
+    friendsChanged = patchUserMetadata(friend, event, "friendUsername", "profileImageKey") || friendsChanged;
+  });
+  const selectedProfileChanged = state.selectedProfileUser?.userId === userId
+    && patchUserMetadata(state.selectedProfileUser, event, "username", "profileImageKey");
+
+  if (roomsChanged) renderRoomList();
+  if (selectedRoomChanged) renderRoomHeader();
+  if (messagesChanged) renderMessages({ preserveScroll: true });
+  if (membersChanged && !dom.detailPanel.hidden) renderMembers();
+  if (friendsChanged) renderFriendList();
+
+  if (selectedProfileChanged && !$("#cw-friend-profile-dialog").hidden) {
+    setAvatar(
+      $("#cw-friend-profile-avatar"),
+      state.selectedProfileUser.username,
+      state.selectedProfileUser.profileImageKey
+    );
+    $("#cw-friend-profile-name").textContent = state.selectedProfileUser.username;
+    renderUserProfileAction();
+    if (!$("#cw-profile-image-dialog").hidden) {
+      openOriginalProfileImage(
+        state.selectedProfileUser.profileImageKey,
+        state.selectedProfileUser.username
+      );
+    }
+    renderIcons();
+  }
+};
+
+const replayPendingUserMetadataEvents = () => {
+  if (state.userMetadataSyncing || state.roomListSyncing || state.roomSyncing) return;
+
+  const queuedEvents = state.pendingUserMetadataEvents;
+  state.pendingUserMetadataEvents = [];
+  queuedEvents.forEach(applyUserMetadataEvent);
+};
+
+const handleUserMetadataEvent = (event) => {
+  if (state.sessionInvalidated) return;
+  if (state.userMetadataSyncing || state.roomListSyncing || state.roomSyncing) {
+    state.pendingUserMetadataEvents.push(event);
+    return;
+  }
+  applyUserMetadataEvent(event);
+};
+
 const loadRoomSnapshot = async (roomId, { preservePendingEvents = false } = {}) => {
   state.roomAbortController?.abort();
   state.roomAbortController = new AbortController();
@@ -886,6 +990,7 @@ const loadRoomSnapshot = async (roomId, { preservePendingEvents = false } = {}) 
     scheduleRead();
   } finally {
     if (version === state.roomLoadVersion) state.roomSyncing = false;
+    replayPendingUserMetadataEvents();
   }
 };
 
@@ -1186,6 +1291,8 @@ const selectSidebarTab = (tab) => {
 
 const handleSocketConnected = async () => {
   if (state.sessionInvalidated) return;
+  state.userMetadataSyncing = true;
+  state.pendingUserMetadataEvents = [];
   const firstConnection = !state.hasConnected;
   const reconnectingRoomId = firstConnection ? null : state.selectedRoomId;
   if (reconnectingRoomId != null) {
@@ -1212,6 +1319,9 @@ const handleSocketConnected = async () => {
       state.pendingRoomEvents = [];
     }
     handleError(error);
+  } finally {
+    state.userMetadataSyncing = false;
+    replayPendingUserMetadataEvents();
   }
 };
 
@@ -1219,6 +1329,7 @@ const socket = new ChatSocket({
   onConnected: handleSocketConnected,
   onListEvent: handleRoomListEvent,
   onRoomEvent: handleRoomEvent,
+  onUserMetadataEvent: handleUserMetadataEvent,
   onError: (error) => {
     if (!error?.transient) handleError(error);
   },

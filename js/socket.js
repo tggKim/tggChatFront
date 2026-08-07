@@ -1,8 +1,8 @@
 import { ensureAccessToken, getApiBaseUrl } from "./api.js";
 
 export class ChatSocket {
-  constructor({ onConnected, onListEvent, onRoomEvent, onError, onAuthFailure }) {
-    this.callbacks = { onConnected, onListEvent, onRoomEvent, onError, onAuthFailure };
+  constructor({ onConnected, onListEvent, onRoomEvent, onUserMetadataEvent, onError, onAuthFailure }) {
+    this.callbacks = { onConnected, onListEvent, onRoomEvent, onUserMetadataEvent, onError, onAuthFailure };
     this.client = null;
     this.roomSubscription = null;
     this.desiredRoomId = null;
@@ -36,6 +36,10 @@ export class ChatSocket {
         this.client.subscribe("/user/queue/chatRooms/list", (frame) => {
           const event = this.parseFrame(frame);
           if (event) this.callbacks.onListEvent(event);
+        });
+        this.client.subscribe("/user/queue/users/metadata", (frame) => {
+          const event = this.parseFrame(frame);
+          if (event) this.callbacks.onUserMetadataEvent(event);
         });
         this.subscribeDesiredRoom();
         this.callbacks.onConnected();
