@@ -63,7 +63,7 @@ const parseResponse = async (response) => {
   return contentType.includes("application/json") ? response.json() : null;
 };
 
-const refreshAccessToken = async () => {
+export const refreshAccessToken = async () => {
   throwIfSessionInvalidated();
   if (refreshPromise) {
     return refreshPromise;
@@ -212,6 +212,11 @@ export const api = {
   getMessages: (roomId, offsetMessageId = null, signal) => {
     const query = offsetMessageId == null ? "" : `?offsetMessageId=${offsetMessageId}`;
     return request(`/chatRooms/${roomId}/messages${query}`, { signal });
+  },
+  sendMessageFiles: (roomId, files) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    return request(`/chatRooms/${roomId}/files`, { method: "POST", body: formData });
   },
   getReadStatuses: (roomId, signal) => request(`/chatRooms/${roomId}/readStatuses`, { signal }),
   updateBaseRoomName: (roomId, roomName) => request(`/chatRooms/${roomId}/name`, {

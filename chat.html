@@ -102,9 +102,10 @@
           </div>
 
           <form class="cw-composer" id="cw-composer">
-            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-file-button" aria-label="파일 첨부" data-tooltip="파일 첨부 준비 중">
+            <button type="button" class="btn btn-ghost cw-icon-button" id="cw-file-button" aria-label="파일 첨부" data-tooltip="파일 첨부">
               <i data-lucide="paperclip" aria-hidden="true"></i>
             </button>
+            <input type="file" id="cw-file-input" multiple hidden />
             <input class="form-control" id="cw-message-input" aria-label="메시지 입력" placeholder="메시지를 입력하세요" autocomplete="off" />
             <button type="submit" class="btn btn-primary cw-icon-button" aria-label="메시지 전송" data-tooltip="전송">
               <i data-lucide="send" aria-hidden="true"></i>
@@ -278,6 +279,42 @@
             role="img"
             aria-label="프로필 원본 이미지"
           ></div>
+        </section>
+      </div>
+
+      <div class="cw-dialog-backdrop" id="cw-message-media-dialog" hidden>
+        <section
+          class="card cw-dialog cw-message-media-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cw-message-media-title"
+        >
+          <div class="cw-popover-header">
+            <span class="cw-sidebar-title cw-message-media-title" id="cw-message-media-title">미디어</span>
+            <button
+              type="button"
+              class="btn btn-ghost cw-icon-button"
+              id="cw-message-media-close"
+              aria-label="미디어 닫기"
+            ><i data-lucide="x" aria-hidden="true"></i></button>
+          </div>
+          <div class="cw-message-media-viewer">
+            <button
+              type="button"
+              class="btn btn-ghost cw-icon-button cw-message-media-navigation cw-message-media-previous"
+              id="cw-message-media-previous"
+              aria-label="이전 이미지"
+              hidden
+            ><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+            <div class="cw-message-media-stage" id="cw-message-media-stage" aria-live="polite"></div>
+            <button
+              type="button"
+              class="btn btn-ghost cw-icon-button cw-message-media-navigation cw-message-media-next"
+              id="cw-message-media-next"
+              aria-label="다음 이미지"
+              hidden
+            ><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+          </div>
         </section>
       </div>
     </div>

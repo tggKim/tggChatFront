@@ -1,4 +1,13 @@
-import { api, clearAccessToken, getAccessToken, getApiBaseUrl, invalidateSession } from "./api.js";
+import {
+  ApiError,
+  api,
+  clearAccessToken,
+  ensureAccessToken,
+  getAccessToken,
+  getApiBaseUrl,
+  invalidateSession,
+  refreshAccessToken
+} from "./api.js";
 import { ChatSocket } from "./socket.js";
 
 const LOGIN_EVENT_KEY = "tggChatLoginEvent";
@@ -17,6 +26,8 @@ const state = {
   readStates: new Map(),
   members: [],
   selectedProfileUser: null,
+  messageMediaViewer: null,
+  messageMediaLoadVersion: 0,
   refreshMembersOnProfileClose: false,
   editTarget: null,
   roomListSyncing: false,
@@ -55,6 +66,8 @@ const dom = {
   headerCount: $("#cw-room-header-count"),
   messages: $("#cw-messages"),
   composer: $("#cw-composer"),
+  fileButton: $("#cw-file-button"),
+  fileInput: $("#cw-file-input"),
   messageInput: $("#cw-message-input"),
   namePopover: $("#cw-name-popover"),
   detailPanel: $("#cw-detail-panel"),
@@ -90,6 +103,11 @@ const toNumber = (value) => value == null ? null : Number(value);
 
 const profileImageUrl = (profileImageKey, variant) =>
   `${getApiBaseUrl()}/profile-images/${encodeURIComponent(profileImageKey)}/${variant}`;
+
+const messageFileUrl = (messageId, fileOrder, storedFileVariant) => {
+  const query = new URLSearchParams({ storedFileVariant });
+  return `${getApiBaseUrl()}/media/messages/${encodeURIComponent(messageId)}/files/${encodeURIComponent(fileOrder)}?${query}`;
+};
 
 const renderIcons = () => {
   if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
@@ -213,6 +231,18 @@ const normalizeRoom = (room) => ({
   unreadCount: toNumber(room.unreadCount) ?? 0
 });
 
+const normalizeMessageFiles = (files) => Array.isArray(files)
+  ? files
+      .map((file) => ({
+        fileOrder: toNumber(file.fileOrder),
+        fileCategory: file.fileCategory ?? "FILE",
+        originalFileName: file.originalFileName || "파일",
+        fileSize: toNumber(file.fileSize)
+      }))
+      .filter((file) => Number.isInteger(file.fileOrder) && file.fileOrder >= 0)
+      .sort((left, right) => left.fileOrder - right.fileOrder)
+  : [];
+
 const normalizeMessage = (message) => ({
   messageId: toNumber(message.messageId),
   chatMessageType: message.chatMessageType ?? "TEXT",
@@ -220,7 +250,8 @@ const normalizeMessage = (message) => ({
   senderId: toNumber(message.senderId),
   senderName: message.senderName ?? null,
   senderProfileImageKey: message.senderProfileImageKey ?? null,
-  createdAt: message.createdAt ?? null
+  createdAt: message.createdAt ?? null,
+  chatEventFiles: normalizeMessageFiles(message.chatEventFiles)
 });
 
 const renderAvatarStack = (container, room, large = false, opensDetails = false) => {
@@ -370,6 +401,372 @@ const unreadCountForMessage = (message) => {
   return count;
 };
 
+const formatFileSize = (fileSize) => {
+  if (!Number.isFinite(fileSize) || fileSize < 0) return "크기 정보 없음";
+  if (fileSize === 0) return "0 B";
+
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(Math.floor(Math.log(fileSize) / Math.log(1024)), units.length - 1);
+  const value = fileSize / (1024 ** unitIndex);
+  const fractionDigits = unitIndex === 0 || value >= 10 ? 0 : 1;
+  return `${value.toFixed(fractionDigits)} ${units[unitIndex]}`;
+};
+
+const mediaRetryUrl = (url) => `${url}&_retry=${Date.now()}`;
+
+const replaceMediaWithFallback = (media, iconName, label) => {
+  if (!media.isConnected) return;
+  const fallback = createElement("span", "cw-media-thumbnail-fallback");
+  const icon = createElement("i");
+  icon.setAttribute("data-lucide", iconName);
+  icon.setAttribute("aria-hidden", "true");
+  fallback.append(icon, createElement("span", "", label));
+  media.replaceWith(fallback);
+  renderIcons();
+};
+
+const loadRetryableImage = (image, url, onFailure) => {
+  let retried = false;
+
+  const handleMediaError = async () => {
+    if (!image.isConnected) {
+      image.removeEventListener("error", handleMediaError);
+      return;
+    }
+
+    if (!retried) {
+      retried = true;
+      try {
+        await ensureAccessToken();
+        if (!image.isConnected) return;
+        image.src = mediaRetryUrl(url);
+        return;
+      } catch (error) {
+        image.removeEventListener("error", handleMediaError);
+        const mediaViewerOpen = !$("#cw-message-media-dialog").hidden;
+        if (mediaViewerOpen) closeMessageMediaViewer();
+        handleError(error);
+        if (!mediaViewerOpen) onFailure();
+        return;
+      }
+    }
+
+    image.removeEventListener("error", handleMediaError);
+    onFailure();
+  };
+
+  image.addEventListener("error", handleMediaError);
+  image.src = url;
+};
+
+const loadRetryableVideo = (video, url, onFailure) => {
+  let retried = false;
+
+  const handleMediaError = async () => {
+    if (!video.isConnected) {
+      video.removeEventListener("error", handleMediaError);
+      return;
+    }
+
+    if (!retried) {
+      retried = true;
+      try {
+        await ensureAccessToken();
+        if (!video.isConnected) return;
+        video.src = mediaRetryUrl(url);
+        video.load();
+        return;
+      } catch (error) {
+        video.removeEventListener("error", handleMediaError);
+        const mediaViewerOpen = !$("#cw-message-media-dialog").hidden;
+        if (mediaViewerOpen) closeMessageMediaViewer();
+        handleError(error);
+        if (!mediaViewerOpen) onFailure();
+        return;
+      }
+    }
+
+    video.removeEventListener("error", handleMediaError);
+    onFailure();
+  };
+
+  video.addEventListener("error", handleMediaError);
+  video.src = url;
+  video.load();
+};
+
+const showMessageMediaError = (message) => {
+  const stage = $("#cw-message-media-stage");
+  stage.replaceChildren();
+
+  const error = createElement("div", "cw-message-media-error");
+  const icon = createElement("i");
+  icon.setAttribute("data-lucide", "circle-alert");
+  icon.setAttribute("aria-hidden", "true");
+  const retryButton = createElement("button", "btn", "다시 시도");
+  retryButton.type = "button";
+  retryButton.addEventListener("click", renderMessageMediaViewer);
+  error.append(icon, createElement("span", "", message), retryButton);
+  stage.append(error);
+  renderIcons();
+};
+
+const closeMessageMediaViewer = () => {
+  const dialog = $("#cw-message-media-dialog");
+  const trigger = state.messageMediaViewer?.triggerElement;
+
+  state.messageMediaViewer = null;
+  state.messageMediaLoadVersion += 1;
+  dialog.hidden = true;
+
+  $("#cw-message-media-stage").querySelectorAll("video").forEach((video) => {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  });
+  $("#cw-message-media-stage").replaceChildren();
+
+  if (trigger?.isConnected) trigger.focus();
+};
+
+const renderMessageMediaViewer = async () => {
+  const viewer = state.messageMediaViewer;
+  if (!viewer) return;
+
+  const version = ++state.messageMediaLoadVersion;
+  const file = viewer.files[viewer.activeIndex];
+  const stage = $("#cw-message-media-stage");
+  const previousButton = $("#cw-message-media-previous");
+  const nextButton = $("#cw-message-media-next");
+  const hasImageNavigation = viewer.mediaType === "IMAGE" && viewer.files.length > 1;
+
+  const title = $("#cw-message-media-title");
+  title.textContent = file.originalFileName;
+  title.title = file.originalFileName;
+  previousButton.hidden = !hasImageNavigation;
+  nextButton.hidden = !hasImageNavigation;
+  previousButton.disabled = viewer.activeIndex === 0;
+  nextButton.disabled = viewer.activeIndex === viewer.files.length - 1;
+  stage.replaceChildren(createElement("div", "cw-message-media-loading", "미디어를 불러오는 중입니다."));
+
+  try {
+    await ensureAccessToken();
+  } catch (error) {
+    if (version !== state.messageMediaLoadVersion) return;
+    closeMessageMediaViewer();
+    handleError(error);
+    return;
+  }
+
+  if (version !== state.messageMediaLoadVersion || state.messageMediaViewer !== viewer) return;
+
+  const originalUrl = messageFileUrl(viewer.messageId, file.fileOrder, "ORIGINAL");
+  stage.replaceChildren();
+
+  if (viewer.mediaType === "IMAGE") {
+    const image = createElement("img", "cw-message-media-image");
+    image.alt = file.originalFileName;
+    stage.append(image);
+    loadRetryableImage(image, originalUrl, () => showMessageMediaError("이미지를 불러오지 못했습니다."));
+    return;
+  }
+
+  const video = createElement("video", "cw-message-media-video");
+  video.controls = true;
+  video.autoplay = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+  video.setAttribute("aria-label", file.originalFileName);
+  stage.append(video);
+  loadRetryableVideo(video, originalUrl, () => showMessageMediaError("이 동영상을 재생할 수 없습니다."));
+};
+
+const openImageMessageViewer = (message, imageFiles, activeIndex, triggerElement) => {
+  state.messageMediaViewer = {
+    mediaType: "IMAGE",
+    messageId: message.messageId,
+    files: imageFiles,
+    activeIndex,
+    triggerElement
+  };
+  $("#cw-message-media-dialog").hidden = false;
+  renderMessageMediaViewer();
+  $("#cw-message-media-close").focus();
+};
+
+const openVideoMessageViewer = (message, file, triggerElement) => {
+  state.messageMediaViewer = {
+    mediaType: "VIDEO",
+    messageId: message.messageId,
+    files: [file],
+    activeIndex: 0,
+    triggerElement
+  };
+  $("#cw-message-media-dialog").hidden = false;
+  renderMessageMediaViewer();
+  $("#cw-message-media-close").focus();
+};
+
+const moveMessageMediaViewer = (offset) => {
+  const viewer = state.messageMediaViewer;
+  if (!viewer || viewer.mediaType !== "IMAGE") return;
+
+  const nextIndex = viewer.activeIndex + offset;
+  if (nextIndex < 0 || nextIndex >= viewer.files.length) return;
+  viewer.activeIndex = nextIndex;
+  renderMessageMediaViewer();
+};
+
+const createImageGallery = (message, imageFiles) => {
+  const gallery = createElement("div", "cw-message-image-gallery");
+  const layout = imageFiles.length <= 5 ? String(imageFiles.length) : "many";
+  gallery.dataset.layout = layout;
+
+  imageFiles.forEach((file, index) => {
+    const button = createElement("button", "cw-message-image-button");
+    button.type = "button";
+    button.setAttribute("aria-label", `${file.originalFileName} 원본 보기`);
+
+    const image = createElement("img", "cw-message-image-thumbnail");
+    image.alt = "";
+    image.loading = "lazy";
+    image.decoding = "async";
+    button.append(image);
+    button.addEventListener("click", () => openImageMessageViewer(message, imageFiles, index, button));
+    gallery.append(button);
+
+    loadRetryableImage(
+      image,
+      messageFileUrl(message.messageId, file.fileOrder, "THUMBNAIL"),
+      () => replaceMediaWithFallback(image, "image-off", "이미지 없음")
+    );
+  });
+
+  return gallery;
+};
+
+const createVideoAttachment = (message, file) => {
+  const button = createElement("button", "cw-message-video-button");
+  button.type = "button";
+  button.setAttribute("aria-label", `${file.originalFileName} 동영상 재생`);
+
+  const image = createElement("img", "cw-message-video-thumbnail");
+  image.alt = "";
+  image.loading = "lazy";
+  image.decoding = "async";
+
+  const play = createElement("span", "cw-message-video-play");
+  const playIcon = createElement("i");
+  playIcon.setAttribute("data-lucide", "play");
+  playIcon.setAttribute("aria-hidden", "true");
+  play.append(playIcon);
+
+  button.append(image, play);
+  button.addEventListener("click", () => openVideoMessageViewer(message, file, button));
+  loadRetryableImage(
+    image,
+    messageFileUrl(message.messageId, file.fileOrder, "THUMBNAIL"),
+    () => replaceMediaWithFallback(image, "video-off", "미리보기 없음")
+  );
+  return button;
+};
+
+const createFileAttachment = (message, file) => {
+  const item = createElement("div", "cw-message-file-item");
+  const fileIcon = createElement("span", "cw-message-file-icon");
+  const icon = createElement("i");
+  icon.setAttribute("data-lucide", "file");
+  icon.setAttribute("aria-hidden", "true");
+  fileIcon.append(icon);
+
+  const copy = createElement("span", "cw-message-file-copy");
+  const name = createElement("span", "cw-message-file-name", file.originalFileName);
+  name.title = file.originalFileName;
+  copy.append(name, createElement("span", "cw-message-file-size", formatFileSize(file.fileSize)));
+
+  const downloadButton = createElement("button", "btn btn-ghost cw-icon-button cw-message-file-download");
+  const downloadIcon = createElement("i");
+  downloadButton.type = "button";
+  downloadButton.setAttribute("aria-label", `${file.originalFileName} 다운로드`);
+  downloadButton.dataset.tooltip = "다운로드";
+  downloadIcon.setAttribute("data-lucide", "download");
+  downloadIcon.setAttribute("aria-hidden", "true");
+  downloadButton.append(downloadIcon);
+  downloadButton.addEventListener("click", async () => {
+    downloadButton.disabled = true;
+    const downloadFrame = document.createElement("iframe");
+    downloadFrame.hidden = true;
+    downloadFrame.title = `${file.originalFileName} 다운로드`;
+    document.body.append(downloadFrame);
+
+    try {
+      await ensureAccessToken();
+      const originalUrl = messageFileUrl(message.messageId, file.fileOrder, "ORIGINAL");
+      let downloadUrl = originalUrl;
+      let response = await fetch(downloadUrl, {
+        method: "GET",
+        credentials: "include",
+        headers: { Range: "bytes=0-0" }
+      });
+      await response.body?.cancel();
+
+      if (response.status === 401) {
+        await refreshAccessToken();
+        downloadUrl = mediaRetryUrl(originalUrl);
+        response = await fetch(downloadUrl, {
+          method: "GET",
+          credentials: "include",
+          headers: { Range: "bytes=0-0" }
+        });
+        await response.body?.cancel();
+      }
+
+      if (!response.ok) {
+        const errorMessage = response.status === 404
+          ? "파일을 찾을 수 없습니다."
+          : "파일을 다운로드하지 못했습니다.";
+        throw new ApiError(errorMessage, response.status);
+      }
+
+      downloadFrame.src = downloadUrl;
+      setTimeout(() => downloadFrame.remove(), 86_400_000);
+    } catch (error) {
+      downloadFrame.remove();
+      handleError(error instanceof TypeError ? new ApiError("서버에 연결할 수 없습니다.") : error);
+    } finally {
+      downloadButton.disabled = false;
+    }
+  });
+
+  item.append(fileIcon, copy, downloadButton);
+  return item;
+};
+
+const createFileMessageContent = (message) => {
+  const attachments = createElement("div", "cw-message-attachments");
+  const imageFiles = message.chatEventFiles.filter((file) => file.fileCategory === "IMAGE");
+  let renderedImageGallery = false;
+
+  message.chatEventFiles.forEach((file) => {
+    if (file.fileCategory === "IMAGE") {
+      if (!renderedImageGallery) {
+        attachments.append(createImageGallery(message, imageFiles));
+        renderedImageGallery = true;
+      }
+      return;
+    }
+
+    if (file.fileCategory === "VIDEO") {
+      attachments.append(createVideoAttachment(message, file));
+      return;
+    }
+
+    attachments.append(createFileAttachment(message, file));
+  });
+
+  return attachments;
+};
+
 const renderMessages = ({ preserveScroll = false } = {}) => {
   const previousHeight = dom.messages.scrollHeight;
   const previousTop = dom.messages.scrollTop;
@@ -419,7 +816,11 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
     if (!mine) {
       body.append(createElement("span", "cw-message-sender", message.senderName || "알 수 없는 사용자"));
     }
-    body.append(createElement("div", "cw-message", message.content));
+    if (message.chatMessageType === "FILE" && message.chatEventFiles.length) {
+      body.append(createFileMessageContent(message));
+    } else {
+      body.append(createElement("div", "cw-message", message.content));
+    }
 
     const metadata = createElement("div", "cw-message-meta");
     const unreadCount = unreadCountForMessage(message);
@@ -506,6 +907,7 @@ const closeDialogs = () => {
     && !$("#cw-friend-profile-dialog").hidden
     && !dom.detailPanel.hidden;
 
+  closeMessageMediaViewer();
   $$(".cw-dialog-backdrop").forEach((dialog) => {
     if (dialog !== dom.messageDialog) dialog.hidden = true;
   });
@@ -520,6 +922,20 @@ const closeDialogs = () => {
 
 const setSubmitting = (form, submitting) => {
   [...form.elements].forEach((element) => { element.disabled = submitting; });
+};
+
+const setFileUploading = (uploading) => {
+  dom.fileButton.disabled = uploading;
+  dom.fileInput.disabled = uploading;
+  dom.fileButton.setAttribute("aria-busy", String(uploading));
+  dom.fileButton.setAttribute("aria-label", uploading ? "파일 전송 중" : "파일 첨부");
+  dom.fileButton.dataset.tooltip = uploading ? "파일 전송 중" : "파일 첨부";
+
+  const icon = createElement("i");
+  icon.setAttribute("data-lucide", uploading ? "loader-circle" : "paperclip");
+  icon.setAttribute("aria-hidden", "true");
+  dom.fileButton.replaceChildren(icon);
+  renderIcons();
 };
 
 const isAuthenticationError = (error) => {
@@ -762,6 +1178,7 @@ const closeActiveRoom = () => {
   state.hasOlderMessages = false;
   state.loadingOlderMessages = false;
   socket.unsubscribeRoom();
+  closeMessageMediaViewer();
   closeDetails();
   dom.namePopover.hidden = true;
   renderRoomList();
@@ -1378,14 +1795,24 @@ const bindEvents = () => {
   });
   $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", closeDialogs));
   $("[data-close-profile-image]").addEventListener("click", closeOriginalProfileImage);
+  $("#cw-message-media-close").addEventListener("click", closeMessageMediaViewer);
+  $("#cw-message-media-previous").addEventListener("click", () => moveMessageMediaViewer(-1));
+  $("#cw-message-media-next").addEventListener("click", () => moveMessageMediaViewer(1));
   $$(".cw-dialog-backdrop").forEach((backdrop) => {
-    if (backdrop === dom.messageDialog || backdrop.id === "cw-profile-image-dialog") return;
+    if (
+      backdrop === dom.messageDialog
+      || backdrop.id === "cw-profile-image-dialog"
+      || backdrop.id === "cw-message-media-dialog"
+    ) return;
     backdrop.addEventListener("click", (event) => {
       if (event.target === backdrop) closeDialogs();
     });
   });
   $("#cw-profile-image-dialog").addEventListener("click", (event) => {
     if (event.target === event.currentTarget) closeOriginalProfileImage();
+  });
+  $("#cw-message-media-dialog").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closeMessageMediaViewer();
   });
   dom.messageDialogConfirm.addEventListener("click", closeMessage);
 
@@ -1549,7 +1976,29 @@ const bindEvents = () => {
     }
   });
 
-  $("#cw-file-button").addEventListener("click", () => showMessage("파일 전송 API는 아직 준비되지 않았습니다."));
+  dom.fileButton.addEventListener("click", () => {
+    if (state.selectedRoomId == null || dom.fileButton.disabled) return;
+    dom.fileInput.click();
+  });
+  dom.fileInput.addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+    const files = [...(input.files || [])];
+    const roomId = state.selectedRoomId;
+    if (!files.length || roomId == null) {
+      input.value = "";
+      return;
+    }
+
+    setFileUploading(true);
+    try {
+      await api.sendMessageFiles(roomId, files);
+    } catch (error) {
+      handleError(error);
+    } finally {
+      input.value = "";
+      setFileUploading(false);
+    }
+  });
   $("#cw-profile-image-button").addEventListener("click", () => $("#cw-profile-image-input").click());
   $("#cw-my-avatar").addEventListener("click", () => {
     openOriginalProfileImage($("#cw-my-avatar").dataset.profileImageKey, state.me?.username);
@@ -1592,6 +2041,38 @@ const bindEvents = () => {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (!$("#cw-message-media-dialog").hidden) {
+      if (event.key === "Tab") {
+        const dialog = $("#cw-message-media-dialog");
+        const focusableElements = [...dialog.querySelectorAll(
+          "button:not([hidden]):not(:disabled), video[controls]"
+        )].filter((element) => element.offsetParent !== null);
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements.at(-1);
+
+        if (event.shiftKey && (document.activeElement === firstElement || !dialog.contains(document.activeElement))) {
+          event.preventDefault();
+          lastElement?.focus();
+        } else if (!event.shiftKey && (document.activeElement === lastElement || !dialog.contains(document.activeElement))) {
+          event.preventDefault();
+          firstElement?.focus();
+        }
+        return;
+      }
+      if (event.key === "Escape") {
+        closeMessageMediaViewer();
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        moveMessageMediaViewer(-1);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        moveMessageMediaViewer(1);
+        return;
+      }
+    }
+
     if (event.key !== "Escape") return;
     if (!$("#cw-profile-image-dialog").hidden) {
       closeOriginalProfileImage();
