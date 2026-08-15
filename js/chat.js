@@ -40,6 +40,7 @@ const state = {
   pendingRoomEvents: [],
   roomLoadVersion: 0,
   roomAbortController: null,
+  messageScrollPinned: false,
   readTimer: null,
   membershipRefreshTimer: null,
   membershipRefreshVersion: 0,
@@ -401,6 +402,14 @@ const unreadCountForMessage = (message) => {
   return count;
 };
 
+const maintainPinnedMessageScroll = () => {
+  if (!state.messageScrollPinned) return;
+  dom.messages.scrollTop = dom.messages.scrollHeight;
+  requestAnimationFrame(() => {
+    if (state.messageScrollPinned) dom.messages.scrollTop = dom.messages.scrollHeight;
+  });
+};
+
 const formatFileSize = (fileSize) => {
   if (!Number.isFinite(fileSize) || fileSize < 0) return "크기 정보 없음";
   if (fileSize === 0) return "0 B";
@@ -631,6 +640,7 @@ const createImageGallery = (message, imageFiles) => {
     image.alt = "";
     image.loading = "lazy";
     image.decoding = "async";
+    image.addEventListener("load", maintainPinnedMessageScroll, { once: true });
     button.append(image);
     button.addEventListener("click", () => openImageMessageViewer(message, imageFiles, index, button));
     gallery.append(button);
@@ -638,7 +648,10 @@ const createImageGallery = (message, imageFiles) => {
     loadRetryableImage(
       image,
       messageFileUrl(message.messageId, file.fileOrder, "THUMBNAIL"),
-      () => replaceMediaWithFallback(image, "image-off", "이미지 없음")
+      () => {
+        replaceMediaWithFallback(image, "image-off", "이미지 없음");
+        maintainPinnedMessageScroll();
+      }
     );
   });
 
@@ -654,6 +667,7 @@ const createVideoAttachment = (message, file) => {
   image.alt = "";
   image.loading = "lazy";
   image.decoding = "async";
+  image.addEventListener("load", maintainPinnedMessageScroll, { once: true });
 
   const play = createElement("span", "cw-message-video-play");
   const playIcon = createElement("i");
@@ -666,7 +680,10 @@ const createVideoAttachment = (message, file) => {
   loadRetryableImage(
     image,
     messageFileUrl(message.messageId, file.fileOrder, "THUMBNAIL"),
-    () => replaceMediaWithFallback(image, "video-off", "미리보기 없음")
+    () => {
+      replaceMediaWithFallback(image, "video-off", "미리보기 없음");
+      maintainPinnedMessageScroll();
+    }
   );
   return button;
 };
@@ -837,10 +854,12 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
     dom.messages.append(row);
   });
 
-  if (preserveScroll) {
+  if (!preserveScroll) state.messageScrollPinned = true;
+
+  if (state.messageScrollPinned) {
+    maintainPinnedMessageScroll();
+  } else if (preserveScroll) {
     dom.messages.scrollTop = dom.messages.scrollHeight - previousHeight + previousTop;
-  } else {
-    dom.messages.scrollTop = dom.messages.scrollHeight;
   }
   renderIcons();
 };
@@ -965,6 +984,7 @@ const handleOtherTabLogin = () => {
   state.membershipRefreshTimer = null;
   state.roomAbortController?.abort();
   state.roomAbortController = null;
+  state.messageScrollPinned = false;
   state.roomLoadVersion += 1;
   state.membershipRefreshVersion += 1;
   state.detailLoadVersion += 1;
@@ -1164,6 +1184,7 @@ const closeActiveRoom = () => {
   state.membershipRefreshTimer = null;
   state.roomAbortController?.abort();
   state.roomAbortController = null;
+  state.messageScrollPinned = false;
   state.roomLoadVersion += 1;
   state.membershipRefreshVersion += 1;
   state.selectedRoomId = null;
@@ -1416,6 +1437,7 @@ const openRoom = async (roomId) => {
   state.membershipRefreshVersion += 1;
   state.detailLoadVersion += 1;
   state.messages = [];
+  state.messageScrollPinned = true;
   state.readStates.clear();
   state.members = [];
   closeDetails();
@@ -1772,6 +1794,13 @@ const bindEvents = () => {
       handleOtherTabLogin();
     }
   });
+
+  const releasePinnedMessageScroll = () => {
+    state.messageScrollPinned = false;
+  };
+  dom.messages.addEventListener("wheel", releasePinnedMessageScroll, { passive: true });
+  dom.messages.addEventListener("touchstart", releasePinnedMessageScroll, { passive: true });
+  dom.messages.addEventListener("pointerdown", releasePinnedMessageScroll);
 
   Object.entries(sidebarTabs).forEach(([tab, button]) => button.addEventListener("click", async () => {
     selectSidebarTab(tab);
