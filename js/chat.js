@@ -12,6 +12,11 @@ import { ChatSocket } from "./socket.js";
 
 const LOGIN_EVENT_KEY = "tggChatLoginEvent";
 const CREATED_ROOM_EVENT_TIMEOUT_MS = 5000;
+const MESSAGE_SCROLL_MODE = Object.freeze({
+  BOTTOM: "BOTTOM",
+  KEEP_VIEW: "KEEP_VIEW",
+  PREPEND: "PREPEND"
+});
 
 const root = document.getElementById("chat-layout-wireframe");
 const $ = (selector) => root.querySelector(selector);
@@ -41,6 +46,8 @@ const state = {
   roomLoadVersion: 0,
   roomAbortController: null,
   messageScrollPinned: false,
+  messageVisibilityCheckVersion: 0,
+  newMessageNotice: null,
   readTimer: null,
   membershipRefreshTimer: null,
   membershipRefreshVersion: 0,
@@ -66,6 +73,8 @@ const dom = {
   headerName: $("#cw-room-header-name"),
   headerCount: $("#cw-room-header-count"),
   messages: $("#cw-messages"),
+  newMessageNotice: $("#cw-new-message-notice"),
+  newMessageNoticeText: $("#cw-new-message-notice-text"),
   composer: $("#cw-composer"),
   fileButton: $("#cw-file-button"),
   fileInput: $("#cw-file-input"),
@@ -92,6 +101,7 @@ const sidebarTabs = {
 };
 
 let messageDialogAction = null;
+let messageScrollFrame = null;
 
 const createElement = (tag, className, text) => {
   const element = document.createElement(tag);
@@ -407,6 +417,95 @@ const maintainPinnedMessageScroll = () => {
   dom.messages.scrollTop = dom.messages.scrollHeight;
   requestAnimationFrame(() => {
     if (state.messageScrollPinned) dom.messages.scrollTop = dom.messages.scrollHeight;
+  });
+};
+
+const isMessageListAtBottom = () =>
+  dom.messages.scrollHeight - dom.messages.clientHeight - dom.messages.scrollTop <= 2;
+
+const currentMessageScrollMode = () =>
+  state.messageScrollPinned || isMessageListAtBottom()
+    ? MESSAGE_SCROLL_MODE.BOTTOM
+    : MESSAGE_SCROLL_MODE.KEEP_VIEW;
+
+const findMessageElement = (messageId) =>
+  messageId == null
+    ? null
+    : dom.messages.querySelector(`[data-message-id="${messageId}"]`);
+
+const isMessageVisible = (messageId) => {
+  const messageElement = findMessageElement(messageId);
+  if (!messageElement) return false;
+
+  const viewportRect = dom.messages.getBoundingClientRect();
+  const messageRect = messageElement.getBoundingClientRect();
+  return messageRect.bottom > viewportRect.top && messageRect.top < viewportRect.bottom;
+};
+
+const captureMessageScrollAnchor = () => {
+  const viewportRect = dom.messages.getBoundingClientRect();
+  const messageElement = [...dom.messages.querySelectorAll("[data-message-id]")]
+    .find((candidate) => {
+      const candidateRect = candidate.getBoundingClientRect();
+      return candidateRect.bottom > viewportRect.top && candidateRect.top < viewportRect.bottom;
+    });
+
+  if (!messageElement) return null;
+  return {
+    messageId: Number(messageElement.dataset.messageId),
+    offsetTop: messageElement.getBoundingClientRect().top - viewportRect.top
+  };
+};
+
+const restoreMessageScrollAnchor = (anchor, fallbackTop) => {
+  dom.messages.scrollTop = fallbackTop;
+  if (!anchor) return;
+
+  const messageElement = findMessageElement(anchor.messageId);
+  if (!messageElement) return;
+
+  const viewportTop = dom.messages.getBoundingClientRect().top;
+  const nextOffsetTop = messageElement.getBoundingClientRect().top - viewportTop;
+  dom.messages.scrollTop += nextOffsetTop - anchor.offsetTop;
+};
+
+const hideNewMessageNotice = () => {
+  state.newMessageNotice = null;
+  dom.newMessageNotice.hidden = true;
+  dom.newMessageNoticeText.textContent = "";
+};
+
+const cancelNewMessageNotice = () => {
+  state.messageVisibilityCheckVersion += 1;
+  hideNewMessageNotice();
+};
+
+const showNewMessageNotice = (message) => {
+  const content = String(message.content ?? "").trim()
+    || (message.chatMessageType === "FILE" ? `파일 ${message.chatEventFiles.length}개` : "새 메시지가 도착했습니다.");
+  state.newMessageNotice = {
+    roomId: state.selectedRoomId,
+    messageId: message.messageId
+  };
+  dom.newMessageNoticeText.textContent = content;
+  dom.newMessageNotice.hidden = false;
+};
+
+const scheduleNewMessageVisibilityCheck = (message) => {
+  const roomId = state.selectedRoomId;
+  const version = ++state.messageVisibilityCheckVersion;
+
+  requestAnimationFrame(() => {
+    if (
+      version !== state.messageVisibilityCheckVersion
+      || roomId !== state.selectedRoomId
+    ) return;
+
+    if (state.newMessageNotice && isMessageVisible(state.newMessageNotice.messageId)) {
+      hideNewMessageNotice();
+    }
+    if (isMessageVisible(message.messageId)) return;
+    showNewMessageNotice(message);
   });
 };
 
@@ -781,9 +880,12 @@ const createFileMessageContent = (message) => {
   return attachments;
 };
 
-const renderMessages = ({ preserveScroll = false } = {}) => {
+const renderMessages = ({ scrollMode = MESSAGE_SCROLL_MODE.BOTTOM } = {}) => {
   const previousHeight = dom.messages.scrollHeight;
   const previousTop = dom.messages.scrollTop;
+  const scrollAnchor = scrollMode === MESSAGE_SCROLL_MODE.BOTTOM
+    ? null
+    : captureMessageScrollAnchor();
   dom.messages.replaceChildren();
 
   const olderButton = createElement("button", "btn cw-load-older", "이전 메시지");
@@ -796,6 +898,7 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
 
   if (!state.messages.length) {
     dom.messages.append(createElement("div", "cw-list-state", "아직 메시지가 없습니다."));
+    state.messageScrollPinned = scrollMode === MESSAGE_SCROLL_MODE.BOTTOM;
     return;
   }
 
@@ -810,6 +913,7 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
 
     if (message.chatMessageType === "JOIN_TEXT" || message.chatMessageType === "LEAVE_TEXT") {
       const system = createElement("div", "cw-system-message", message.content);
+      system.dataset.messageId = String(message.messageId);
       system.append(createElement("span", "cw-system-time", formatMessageTime(message.createdAt)));
       dom.messages.append(system);
       return;
@@ -817,6 +921,7 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
 
     const mine = message.senderId != null && message.senderId === state.me?.userId;
     const row = createElement("div", `cw-message-row${mine ? " mine" : ""}`);
+    row.dataset.messageId = String(message.messageId);
     if (!mine) {
       const sender = {
         userId: message.senderId,
@@ -854,12 +959,14 @@ const renderMessages = ({ preserveScroll = false } = {}) => {
     dom.messages.append(row);
   });
 
-  if (!preserveScroll) state.messageScrollPinned = true;
-
-  if (state.messageScrollPinned) {
+  state.messageScrollPinned = scrollMode === MESSAGE_SCROLL_MODE.BOTTOM;
+  if (scrollMode === MESSAGE_SCROLL_MODE.BOTTOM) {
     maintainPinnedMessageScroll();
-  } else if (preserveScroll) {
-    dom.messages.scrollTop = dom.messages.scrollHeight - previousHeight + previousTop;
+  } else {
+    const fallbackTop = scrollMode === MESSAGE_SCROLL_MODE.PREPEND
+      ? dom.messages.scrollHeight - previousHeight + previousTop
+      : previousTop;
+    restoreMessageScrollAnchor(scrollAnchor, fallbackTop);
   }
   renderIcons();
 };
@@ -985,6 +1092,7 @@ const handleOtherTabLogin = () => {
   state.roomAbortController?.abort();
   state.roomAbortController = null;
   state.messageScrollPinned = false;
+  cancelNewMessageNotice();
   state.roomLoadVersion += 1;
   state.membershipRefreshVersion += 1;
   state.detailLoadVersion += 1;
@@ -1185,6 +1293,7 @@ const closeActiveRoom = () => {
   state.roomAbortController?.abort();
   state.roomAbortController = null;
   state.messageScrollPinned = false;
+  cancelNewMessageNotice();
   state.roomLoadVersion += 1;
   state.membershipRefreshVersion += 1;
   state.selectedRoomId = null;
@@ -1258,16 +1367,25 @@ const handleRoomListEvent = (event) => {
   applyRoomListEvent(event);
 };
 
-const applyRoomEvent = (event, snapshotMessageId = null) => {
+const applyRoomEvent = (event, snapshotMessageId = null, { allowNewMessageNotice = true } = {}) => {
   if (toNumber(event.roomId) !== state.selectedRoomId) return;
 
   if (event.chatEventType === "MESSAGE_SENT") {
     const message = normalizeMessage(event);
     if (snapshotMessageId != null && message.messageId <= snapshotMessageId) return;
     if (!state.messages.some((candidate) => candidate.messageId === message.messageId)) {
+      const sentByCurrentUser = message.senderId != null && message.senderId === state.me?.userId;
+      const scrollMode = sentByCurrentUser
+        ? MESSAGE_SCROLL_MODE.BOTTOM
+        : currentMessageScrollMode();
       state.messages.push(message);
       state.messages.sort((left, right) => left.messageId - right.messageId);
-      renderMessages();
+      renderMessages({ scrollMode });
+      if (sentByCurrentUser) {
+        cancelNewMessageNotice();
+      } else if (allowNewMessageNotice) {
+        scheduleNewMessageVisibilityCheck(message);
+      }
       scheduleRead();
 
       const room = state.rooms.get(state.selectedRoomId);
@@ -1281,7 +1399,7 @@ const applyRoomEvent = (event, snapshotMessageId = null) => {
     const currentBoundary = state.readStates.get(readerUserId);
     if (readerUserId != null && nextBoundary != null && (currentBoundary == null || nextBoundary > currentBoundary)) {
       state.readStates.set(readerUserId, nextBoundary);
-      renderMessages({ preserveScroll: true });
+      renderMessages({ scrollMode: currentMessageScrollMode() });
     }
   }
 };
@@ -1355,7 +1473,7 @@ const applyUserMetadataEvent = (event) => {
 
   if (roomsChanged) renderRoomList();
   if (selectedRoomChanged) renderRoomHeader();
-  if (messagesChanged) renderMessages({ preserveScroll: true });
+  if (messagesChanged) renderMessages({ scrollMode: currentMessageScrollMode() });
   if (membersChanged && !dom.detailPanel.hidden) renderMembers();
   if (friendsChanged) renderFriendList();
 
@@ -1399,6 +1517,7 @@ const loadRoomSnapshot = async (roomId, { preservePendingEvents = false } = {}) 
   state.roomAbortController = new AbortController();
   const version = ++state.roomLoadVersion;
   state.roomSyncing = true;
+  cancelNewMessageNotice();
   if (!preservePendingEvents) state.pendingRoomEvents = [];
   dom.messages.replaceChildren(createElement("div", "cw-list-state", "메시지를 불러오는 중입니다."));
 
@@ -1420,8 +1539,12 @@ const loadRoomSnapshot = async (roomId, { preservePendingEvents = false } = {}) 
     const snapshotMessageId = state.messages.at(-1)?.messageId ?? null;
     const queuedEvents = state.pendingRoomEvents;
     state.pendingRoomEvents = [];
-    queuedEvents.forEach((event) => applyRoomEvent(event, snapshotMessageId));
-    renderMessages();
+    queuedEvents.forEach((event) => applyRoomEvent(
+      event,
+      snapshotMessageId,
+      { allowNewMessageNotice: false }
+    ));
+    renderMessages({ scrollMode: MESSAGE_SCROLL_MODE.BOTTOM });
     scheduleRead();
   } finally {
     if (version === state.roomLoadVersion) state.roomSyncing = false;
@@ -1438,6 +1561,7 @@ const openRoom = async (roomId) => {
   state.detailLoadVersion += 1;
   state.messages = [];
   state.messageScrollPinned = true;
+  cancelNewMessageNotice();
   state.readStates.clear();
   state.members = [];
   closeDetails();
@@ -1468,7 +1592,7 @@ const loadOlderMessages = async () => {
     state.messages = [...older.filter((message) => !existingIds.has(message.messageId)), ...state.messages]
       .sort((left, right) => left.messageId - right.messageId);
     state.loadingOlderMessages = false;
-    renderMessages({ preserveScroll: true });
+    renderMessages({ scrollMode: MESSAGE_SCROLL_MODE.PREPEND });
   } catch (error) {
     handleError(error);
   } finally {
@@ -1522,7 +1646,7 @@ const refreshSelectedMembershipState = async () => {
     state.members = members;
     renderMembers();
   }
-  renderMessages({ preserveScroll: true });
+  renderMessages({ scrollMode: currentMessageScrollMode() });
 };
 
 const scheduleSelectedMembershipRefresh = () => {
@@ -1801,6 +1925,21 @@ const bindEvents = () => {
   dom.messages.addEventListener("wheel", releasePinnedMessageScroll, { passive: true });
   dom.messages.addEventListener("touchstart", releasePinnedMessageScroll, { passive: true });
   dom.messages.addEventListener("pointerdown", releasePinnedMessageScroll);
+  dom.messages.addEventListener("scroll", () => {
+    if (messageScrollFrame != null) return;
+    messageScrollFrame = requestAnimationFrame(() => {
+      messageScrollFrame = null;
+      if (isMessageListAtBottom()) state.messageScrollPinned = true;
+      if (state.newMessageNotice && isMessageVisible(state.newMessageNotice.messageId)) {
+        hideNewMessageNotice();
+      }
+    });
+  }, { passive: true });
+  dom.newMessageNotice.addEventListener("click", () => {
+    cancelNewMessageNotice();
+    state.messageScrollPinned = true;
+    maintainPinnedMessageScroll();
+  });
 
   Object.entries(sidebarTabs).forEach(([tab, button]) => button.addEventListener("click", async () => {
     selectSidebarTab(tab);

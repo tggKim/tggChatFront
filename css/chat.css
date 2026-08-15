@@ -535,6 +535,7 @@
       height: 100%;
       min-height: 0;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr) auto;
     }
 
@@ -586,14 +587,69 @@
     }
 
     #chat-layout-wireframe .cw-messages {
+      grid-column: 1;
+      grid-row: 2;
       display: flex;
       flex-direction: column;
       gap: 12px;
       min-height: 0;
       overflow-x: hidden;
       overflow-y: auto;
+      overflow-anchor: none;
       padding: 20px;
       background: color-mix(in srgb, var(--muted) 45%, var(--background));
+    }
+
+    #chat-layout-wireframe .cw-new-message-notice {
+      z-index: 3;
+      grid-column: 1;
+      grid-row: 2;
+      align-self: end;
+      justify-self: center;
+      width: min(360px, calc(100% - 40px));
+      min-width: 0;
+      min-height: 38px;
+      margin: 0 20px 14px;
+      padding: 8px 11px 8px 13px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 76%, var(--border));
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--foreground) 94%, var(--background));
+      color: var(--background);
+      box-shadow: 0 4px 14px rgb(0 0 0 / 16%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    #chat-layout-wireframe .cw-new-message-notice:hover {
+      background: var(--foreground);
+    }
+
+    #chat-layout-wireframe .cw-new-message-notice:focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+
+    #chat-layout-wireframe .cw-new-message-notice[hidden] {
+      display: none;
+    }
+
+    #chat-layout-wireframe .cw-new-message-notice span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #chat-layout-wireframe .cw-new-message-notice svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
     }
 
     #chat-layout-wireframe .cw-load-older {
@@ -846,6 +902,8 @@
     }
 
     #chat-layout-wireframe .cw-composer {
+      grid-column: 1;
+      grid-row: 3;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
@@ -1276,6 +1334,12 @@
 
     html.mobile-layout #chat-layout-wireframe .cw-messages {
       padding: 14px 12px;
+    }
+
+    html.mobile-layout #chat-layout-wireframe .cw-new-message-notice {
+      width: min(360px, calc(100% - 24px));
+      margin-inline: 12px;
+      margin-bottom: 10px;
     }
 
     html.mobile-layout #chat-layout-wireframe .cw-message-body {
