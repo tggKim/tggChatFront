@@ -102,6 +102,7 @@ const sidebarTabs = {
 
 let messageDialogAction = null;
 let messageScrollFrame = null;
+let pinnedMessageScrollFrame = null;
 
 const createElement = (tag, className, text) => {
   const element = document.createElement(tag);
@@ -415,7 +416,10 @@ const unreadCountForMessage = (message) => {
 const maintainPinnedMessageScroll = () => {
   if (!state.messageScrollPinned) return;
   dom.messages.scrollTop = dom.messages.scrollHeight;
-  requestAnimationFrame(() => {
+  if (pinnedMessageScrollFrame != null) return;
+
+  pinnedMessageScrollFrame = requestAnimationFrame(() => {
+    pinnedMessageScrollFrame = null;
     if (state.messageScrollPinned) dom.messages.scrollTop = dom.messages.scrollHeight;
   });
 };
@@ -739,6 +743,7 @@ const createImageGallery = (message, imageFiles) => {
     image.alt = "";
     image.loading = "lazy";
     image.decoding = "async";
+    image.addEventListener("load", maintainPinnedMessageScroll, { once: true });
     button.append(image);
     button.addEventListener("click", () => openImageMessageViewer(message, imageFiles, index, button));
     gallery.append(button);
@@ -746,7 +751,10 @@ const createImageGallery = (message, imageFiles) => {
     loadRetryableImage(
       image,
       messageFileUrl(message.messageId, file.fileOrder, "THUMBNAIL"),
-      () => replaceMediaWithFallback(image, "image-off", "이미지 없음")
+      () => {
+        replaceMediaWithFallback(image, "image-off", "이미지 없음");
+        maintainPinnedMessageScroll();
+      }
     );
   });
 
@@ -762,6 +770,7 @@ const createVideoAttachment = (message, file) => {
   image.alt = "";
   image.loading = "lazy";
   image.decoding = "async";
+  image.addEventListener("load", maintainPinnedMessageScroll, { once: true });
 
   const play = createElement("span", "cw-message-video-play");
   const playIcon = createElement("i");
@@ -774,7 +783,10 @@ const createVideoAttachment = (message, file) => {
   loadRetryableImage(
     image,
     messageFileUrl(message.messageId, file.fileOrder, "THUMBNAIL"),
-    () => replaceMediaWithFallback(image, "video-off", "미리보기 없음")
+    () => {
+      replaceMediaWithFallback(image, "video-off", "미리보기 없음");
+      maintainPinnedMessageScroll();
+    }
   );
   return button;
 };
