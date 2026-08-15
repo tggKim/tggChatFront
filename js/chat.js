@@ -745,16 +745,13 @@ const createFileAttachment = (message, file) => {
 const createFileMessageContent = (message) => {
   const attachments = createElement("div", "cw-message-attachments");
   const imageFiles = message.chatEventFiles.filter((file) => file.fileCategory === "IMAGE");
-  let renderedImageGallery = false;
+
+  if (imageFiles.length) {
+    attachments.append(createImageGallery(message, imageFiles));
+  }
 
   message.chatEventFiles.forEach((file) => {
-    if (file.fileCategory === "IMAGE") {
-      if (!renderedImageGallery) {
-        attachments.append(createImageGallery(message, imageFiles));
-        renderedImageGallery = true;
-      }
-      return;
-    }
+    if (file.fileCategory === "IMAGE") return;
 
     if (file.fileCategory === "VIDEO") {
       attachments.append(createVideoAttachment(message, file));

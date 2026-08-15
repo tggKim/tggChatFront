@@ -590,6 +590,7 @@
       flex-direction: column;
       gap: 12px;
       min-height: 0;
+      overflow-x: hidden;
       overflow-y: auto;
       padding: 20px;
       background: color-mix(in srgb, var(--muted) 45%, var(--background));
@@ -638,6 +639,7 @@
       background: var(--card);
       color: var(--card-foreground);
       border: 1px solid var(--border);
+      overflow-wrap: anywhere;
     }
 
     #chat-layout-wireframe .cw-message-row.mine .cw-message {
@@ -760,10 +762,12 @@
     }
 
     #chat-layout-wireframe .cw-message-file-item {
-      width: 100%;
+      width: max-content;
+      max-width: 100%;
       min-width: 0;
       display: grid;
       grid-template-columns: 38px minmax(0, 1fr) 38px;
+      justify-self: start;
       align-items: center;
       gap: 8px;
       padding: 9px 10px;
@@ -771,6 +775,10 @@
       border-radius: 6px;
       background: var(--card);
       color: var(--card-foreground);
+    }
+
+    #chat-layout-wireframe .cw-message-row.mine .cw-message-file-item {
+      justify-self: end;
     }
 
     #chat-layout-wireframe .cw-message-file-icon {
@@ -790,9 +798,8 @@
     }
 
     #chat-layout-wireframe .cw-message-file-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
       font-size: 13px;
     }
 
@@ -829,6 +836,7 @@
       color: var(--muted-foreground);
       text-align: center;
       font-size: 12px;
+      overflow-wrap: anywhere;
     }
 
     #chat-layout-wireframe .cw-system-time {
