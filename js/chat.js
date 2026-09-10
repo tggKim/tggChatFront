@@ -122,8 +122,24 @@ const messageFileUrl = (messageId, fileOrder, storedFileVariant) => {
   return `${getApiBaseUrl()}/media/messages/${encodeURIComponent(messageId)}/files/${encodeURIComponent(fileOrder)}?${query}`;
 };
 
-const renderIcons = () => {
-  if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
+const createIcon = (name, className = "") => {
+  const iconKey = name.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join("");
+  const library = window.lucide;
+  const iconNode = library?.icons?.[iconKey];
+
+  // A missing icon library must not interrupt uploads or other user actions.
+  if (!iconNode || typeof library.createElement !== "function") {
+    const placeholder = createElement("i", className);
+    placeholder.setAttribute("aria-hidden", "true");
+    return placeholder;
+  }
+
+  const icon = library.createElement(iconNode);
+  icon.setAttribute("width", "16");
+  icon.setAttribute("height", "16");
+  icon.setAttribute("class", ["lucide", `lucide-${name}`, className].filter(Boolean).join(" "));
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
 };
 
 const setAvatar = (avatar, username, profileImageKey) => {
@@ -140,7 +156,6 @@ const setAvatar = (avatar, username, profileImageKey) => {
     image.decoding = "async";
     image.addEventListener("error", () => {
       setAvatar(avatar, username, null);
-      renderIcons();
     }, { once: true });
     avatar.append(image);
     return avatar;
@@ -148,9 +163,7 @@ const setAvatar = (avatar, username, profileImageKey) => {
 
   delete avatar.dataset.profileImageKey;
   avatar.classList.add("cw-avatar-default");
-  const icon = createElement("i", "cw-avatar-default-icon");
-  icon.setAttribute("data-lucide", "user-round");
-  icon.setAttribute("aria-hidden", "true");
+  const icon = createIcon("user-round", "cw-avatar-default-icon");
   avatar.append(icon);
   return avatar;
 };
@@ -312,7 +325,6 @@ const renderAvatarStack = (container, room, large = false, opensDetails = false)
       container.append(createAvatar("?", null, extraClass));
     }
   }
-  renderIcons();
 };
 
 const sortedRooms = () => [...state.rooms.values()].sort((left, right) => {
@@ -356,7 +368,6 @@ const renderRoomList = () => {
     row.append(avatars, copy, meta);
     dom.chatList.append(row);
   });
-  renderIcons();
 };
 
 const renderFriendList = () => {
@@ -377,14 +388,12 @@ const renderFriendList = () => {
     row.addEventListener("click", () => openUserProfile(friend));
     dom.friendList.append(row);
   });
-  renderIcons();
 };
 
 const renderCurrentUser = () => {
   if (!state.me) return;
   setAvatar($("#cw-my-avatar"), state.me.username, state.me.profileImageKey);
   $("#cw-my-name").textContent = state.me.username;
-  renderIcons();
 };
 
 const renderRoomHeader = () => {
@@ -530,12 +539,9 @@ const mediaRetryUrl = (url) => `${url}&_retry=${Date.now()}`;
 const replaceMediaWithFallback = (media, iconName, label) => {
   if (!media.isConnected) return;
   const fallback = createElement("span", "cw-media-thumbnail-fallback");
-  const icon = createElement("i");
-  icon.setAttribute("data-lucide", iconName);
-  icon.setAttribute("aria-hidden", "true");
+  const icon = createIcon(iconName);
   fallback.append(icon, createElement("span", "", label));
   media.replaceWith(fallback);
-  renderIcons();
 };
 
 const loadRetryableImage = (image, url, onFailure) => {
@@ -613,15 +619,12 @@ const showMessageMediaError = (message) => {
   stage.replaceChildren();
 
   const error = createElement("div", "cw-message-media-error");
-  const icon = createElement("i");
-  icon.setAttribute("data-lucide", "circle-alert");
-  icon.setAttribute("aria-hidden", "true");
+  const icon = createIcon("circle-alert");
   const retryButton = createElement("button", "btn", "다시 시도");
   retryButton.type = "button";
   retryButton.addEventListener("click", renderMessageMediaViewer);
   error.append(icon, createElement("span", "", message), retryButton);
   stage.append(error);
-  renderIcons();
 };
 
 const closeMessageMediaViewer = () => {
@@ -774,9 +777,7 @@ const createVideoAttachment = (message, file) => {
   image.addEventListener("load", maintainPinnedMessageScroll, { once: true });
 
   const play = createElement("span", "cw-message-video-play");
-  const playIcon = createElement("i");
-  playIcon.setAttribute("data-lucide", "play");
-  playIcon.setAttribute("aria-hidden", "true");
+  const playIcon = createIcon("play");
   play.append(playIcon);
 
   button.append(image, play);
@@ -795,9 +796,7 @@ const createVideoAttachment = (message, file) => {
 const createFileAttachment = (message, file) => {
   const item = createElement("div", "cw-message-file-item");
   const fileIcon = createElement("span", "cw-message-file-icon");
-  const icon = createElement("i");
-  icon.setAttribute("data-lucide", "file");
-  icon.setAttribute("aria-hidden", "true");
+  const icon = createIcon("file");
   fileIcon.append(icon);
 
   const copy = createElement("span", "cw-message-file-copy");
@@ -806,12 +805,10 @@ const createFileAttachment = (message, file) => {
   copy.append(name, createElement("span", "cw-message-file-size", formatFileSize(file.fileSize)));
 
   const downloadButton = createElement("button", "btn btn-ghost cw-icon-button cw-message-file-download");
-  const downloadIcon = createElement("i");
+  const downloadIcon = createIcon("download");
   downloadButton.type = "button";
   downloadButton.setAttribute("aria-label", `${file.originalFileName} 다운로드`);
   downloadButton.dataset.tooltip = "다운로드";
-  downloadIcon.setAttribute("data-lucide", "download");
-  downloadIcon.setAttribute("aria-hidden", "true");
   downloadButton.append(downloadIcon);
   downloadButton.addEventListener("click", async () => {
     downloadButton.disabled = true;
@@ -973,7 +970,6 @@ const renderMessages = ({ scrollMode = MESSAGE_SCROLL_MODE.BOTTOM } = {}) => {
       : previousTop;
     restoreMessageScrollAnchor(scrollAnchor, fallbackTop);
   }
-  renderIcons();
 };
 
 const showMessage = (message, action = null) => {
@@ -1008,11 +1004,8 @@ const openOriginalProfileImage = (profileImageKey, username) => {
     imageContainer.replaceChildren();
     imageContainer.classList.add("cw-profile-original-default");
     imageContainer.setAttribute("aria-label", `${displayName} 기본 프로필 이미지`);
-    const icon = createElement("i", "cw-profile-original-default-icon");
-    icon.setAttribute("data-lucide", "user-round");
-    icon.setAttribute("aria-hidden", "true");
+    const icon = createIcon("user-round", "cw-profile-original-default-icon");
     imageContainer.append(icon);
-    renderIcons();
   };
 
   if (profileImageKey) {
@@ -1059,11 +1052,8 @@ const setFileUploading = (uploading) => {
   dom.fileButton.setAttribute("aria-label", uploading ? "파일 전송 중" : "파일 첨부");
   dom.fileButton.dataset.tooltip = uploading ? "파일 전송 중" : "파일 첨부";
 
-  const icon = createElement("i");
-  icon.setAttribute("data-lucide", uploading ? "loader-circle" : "paperclip");
-  icon.setAttribute("aria-hidden", "true");
+  const icon = createIcon(uploading ? "loader-circle" : "paperclip");
   dom.fileButton.replaceChildren(icon);
-  renderIcons();
 };
 
 const isAuthenticationError = (error) => {
@@ -1497,7 +1487,6 @@ const applyUserMetadataEvent = (event) => {
         state.selectedProfileUser.username
       );
     }
-    renderIcons();
   }
 };
 
@@ -1697,7 +1686,6 @@ const renderSelectableFriends = (container, friends, checkboxClass) => {
     );
     container.append(label);
   });
-  renderIcons();
 };
 
 const findFriendByUserId = (userId) =>
@@ -1732,7 +1720,6 @@ const openUserProfile = (user) => {
   $("#cw-friend-profile-name").textContent = state.selectedProfileUser.username;
   renderUserProfileAction();
   $("#cw-friend-profile-dialog").hidden = false;
-  renderIcons();
 };
 
 const openNewChatDialog = () => {
@@ -1771,12 +1758,10 @@ const renderMembers = () => {
     const friendAction = createElement("span", "cw-member-friend-action");
     if (member.canAddFriend) {
       const addFriendButton = createElement("button", "btn btn-ghost cw-icon-button");
-      const addFriendIcon = createElement("i");
+      const addFriendIcon = createIcon("user-plus");
       addFriendButton.type = "button";
       addFriendButton.setAttribute("aria-label", `${member.username} 친구 추가`);
       addFriendButton.dataset.tooltip = "친구 추가";
-      addFriendIcon.dataset.lucide = "user-plus";
-      addFriendIcon.setAttribute("aria-hidden", "true");
       addFriendButton.append(addFriendIcon);
       addFriendButton.addEventListener("click", async () => {
         addFriendButton.disabled = true;
@@ -1801,7 +1786,6 @@ const renderMembers = () => {
     dom.memberList.append(row);
   });
   dom.detailTitle.textContent = `참여자 ${state.members.length}명`;
-  renderIcons();
 };
 
 const openDetails = async () => {
@@ -2271,7 +2255,6 @@ const bootstrap = async () => {
     $("#cw-room-close").setAttribute("aria-label", "채팅방 목록으로 돌아가기");
     $("#cw-room-close").dataset.tooltip = "채팅방 목록으로 돌아가기";
   }
-  if (window.lucide) window.lucide.createIcons({ attrs: { width: 16, height: 16 } });
 
   if (!getAccessToken()) {
     showLoginRequired();
