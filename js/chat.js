@@ -44,6 +44,7 @@ const state = {
   roomSyncing: false,
   pendingRoomEvents: [],
   roomLoadVersion: 0,
+  roomOpenTask: null,
   roomAbortController: null,
   messageScrollPinned: false,
   messageVisibilityCheckVersion: 0,
@@ -1290,6 +1291,7 @@ const closeDetails = () => {
 const closeActiveRoom = () => {
   if (state.selectedRoomId == null) return;
 
+  state.roomOpenTask = null;
   clearTimeout(state.readTimer);
   clearTimeout(state.membershipRefreshTimer);
   state.readTimer = null;
@@ -1558,24 +1560,36 @@ const loadRoomSnapshot = async (roomId, { preservePendingEvents = false } = {}) 
 
 const openRoom = async (roomId) => {
   if (!state.rooms.has(roomId)) return;
-  closeDialogs();
-  state.selectedRoomId = roomId;
-  clearTimeout(state.membershipRefreshTimer);
-  state.membershipRefreshVersion += 1;
-  state.detailLoadVersion += 1;
-  state.messages = [];
-  state.messageScrollPinned = true;
-  cancelNewMessageNotice();
-  state.readStates.clear();
-  state.members = [];
-  closeDetails();
-  dom.namePopover.hidden = true;
-  state.hasOlderMessages = false;
-  state.loadingOlderMessages = false;
-  socket.subscribeRoom(roomId);
-  renderRoomList();
-  renderRoomHeader();
-  await loadRoomSnapshot(roomId).catch(handleError);
+  if (state.selectedRoomId === roomId) return;
+  if (state.roomOpenTask?.roomId === roomId) return;
+
+  const task = { roomId };
+  state.roomOpenTask = task;
+
+  try {
+    state.roomAbortController?.abort();
+    cancelScheduledRead();
+    closeDialogs();
+    state.selectedRoomId = roomId;
+    clearTimeout(state.membershipRefreshTimer);
+    state.membershipRefreshVersion += 1;
+    state.detailLoadVersion += 1;
+    state.messages = [];
+    state.messageScrollPinned = true;
+    cancelNewMessageNotice();
+    state.readStates.clear();
+    state.members = [];
+    closeDetails();
+    dom.namePopover.hidden = true;
+    state.hasOlderMessages = false;
+    state.loadingOlderMessages = false;
+    socket.subscribeRoom(roomId);
+    renderRoomList();
+    renderRoomHeader();
+    await loadRoomSnapshot(roomId).catch(handleError);
+  } finally {
+    if (state.roomOpenTask === task) state.roomOpenTask = null;
+  }
 };
 
 const loadOlderMessages = async () => {
