@@ -10,6 +10,7 @@
   const signupEmailInput = document.getElementById("signup-email");
   const showSignupButton = document.getElementById("show-signup");
   const showLoginButton = document.getElementById("show-login");
+  const googleLoginButton = document.getElementById("google-login");
   const loginSubmitButton = document.getElementById("login-submit");
   const signupSubmitButton = document.getElementById("signup-submit");
   const errorDialog = document.getElementById("error-dialog");
@@ -106,6 +107,10 @@
     setView("login");
   });
 
+  googleLoginButton.addEventListener("click", () => {
+    window.location.assign(`${API_BASE_URL}/oauth2/authorization/google`);
+  });
+
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -158,6 +163,14 @@
       setSubmitting(signupSubmitButton, false, "가입 중");
     }
   });
+
+  const oauthError = new URLSearchParams(window.location.search).get("oauthError");
+  if (oauthError === "deleted_account") {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("oauthError");
+    window.history.replaceState(null, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+    showError("삭제된 사용자입니다.");
+  }
 
   errorConfirmButton.addEventListener("click", closeError);
   signupSuccessConfirmButton.addEventListener("click", confirmSignupSuccess);

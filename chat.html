@@ -50,7 +50,10 @@
               <input type="file" id="cw-profile-image-input" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
             </div>
             <div class="cw-profile-name-control">
-              <span class="cw-profile-name" id="cw-my-name">-</span>
+              <span class="cw-friend-search-copy">
+                <span class="cw-profile-name" id="cw-my-name">-</span>
+                <span class="cw-friend-search-email" id="cw-my-user-tag" hidden></span>
+              </span>
               <button type="button" class="btn btn-ghost cw-icon-button" id="cw-edit-my-name" aria-label="내 이름 수정" data-tooltip="내 이름 수정">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" /></svg>
               </button>
@@ -170,18 +173,21 @@
       </div>
 
       <div class="cw-dialog-backdrop" id="cw-friend-add-dialog" hidden>
-        <form class="card cw-dialog" id="cw-friend-add-form" role="dialog" aria-modal="true" aria-labelledby="cw-friend-add-title">
+        <section class="card cw-dialog cw-friend-search-dialog" role="dialog" aria-modal="true" aria-labelledby="cw-friend-add-title">
           <div class="cw-popover-header">
-            <span class="cw-sidebar-title" id="cw-friend-add-title">친구 추가</span>
-            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="친구 추가 닫기"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
+            <span class="cw-sidebar-title" id="cw-friend-add-title">친구 검색</span>
+            <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="친구 검색 닫기"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
           </div>
-          <label class="form-label" for="cw-friend-username">친구 이름</label>
-          <input id="cw-friend-username" class="form-control" maxlength="50" placeholder="정확한 사용자명을 입력하세요" required />
-          <div class="cw-dialog-actions">
-            <button type="button" class="btn" data-close-dialog>취소</button>
-            <button type="submit" class="btn btn-primary">추가</button>
-          </div>
-        </form>
+          <form id="cw-friend-add-form">
+            <label class="form-label" for="cw-friend-username">친구 이름</label>
+            <div class="cw-search-row">
+              <input id="cw-friend-username" class="form-control" maxlength="50" placeholder="정확한 이름을 입력하세요" required />
+              <button type="submit" class="btn btn-primary">검색</button>
+            </div>
+          </form>
+          <p id="cw-friend-search-feedback" class="cw-friend-search-feedback" role="status" hidden></p>
+          <div id="cw-friend-search-results" class="cw-friend-search-results" aria-label="친구 검색 결과" aria-live="polite"></div>
+        </section>
       </div>
 
       <div class="cw-dialog-backdrop" id="cw-new-chat-dialog" hidden>
@@ -189,6 +195,12 @@
           <div class="cw-popover-header">
             <span class="cw-sidebar-title" id="cw-new-chat-title">새 채팅방</span>
             <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="새 채팅방 닫기"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
+          </div>
+          <label class="form-label" for="cw-new-chat-search">친구 검색</label>
+          <input type="search" id="cw-new-chat-search" class="form-control" maxlength="50" autocomplete="off" placeholder="친구 이름을 입력하세요" aria-controls="cw-new-chat-friends" />
+          <div class="cw-selected-friends" id="cw-new-chat-selected-section" hidden>
+            <span class="cw-label text-small">선택된 친구</span>
+            <div class="cw-selected-friend-list" id="cw-new-chat-selected" aria-live="polite"></div>
           </div>
           <div class="cw-invite-list" id="cw-new-chat-friends" aria-label="친구 선택"></div>
           <div class="cw-field" id="cw-group-name-field" hidden>
@@ -211,6 +223,7 @@
           <div class="cw-profile-dialog-body">
             <button type="button" class="cw-avatar cw-avatar-profile" id="cw-friend-profile-avatar" aria-label="프로필 원본 이미지 보기"></button>
             <span class="cw-profile-dialog-name" id="cw-friend-profile-name"></span>
+            <span class="cw-search-profile-email" id="cw-friend-profile-email" hidden></span>
           </div>
           <button type="button" class="btn btn-primary btn-block" id="cw-friend-profile-chat">채팅하기</button>
         </section>
@@ -222,7 +235,13 @@
             <span class="cw-sidebar-title" id="cw-invite-title">사용자 초대</span>
             <button type="button" class="btn btn-ghost cw-icon-button" data-close-dialog aria-label="사용자 초대 닫기"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide lucide-x"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
           </div>
-          <div class="cw-invite-list" id="cw-invitable-friends"></div>
+          <label class="form-label" for="cw-invite-search">친구 검색</label>
+          <input type="search" id="cw-invite-search" class="form-control" maxlength="50" autocomplete="off" placeholder="친구 이름을 입력하세요" aria-controls="cw-invitable-friends" />
+          <div class="cw-selected-friends" id="cw-invite-selected-section" hidden>
+            <span class="cw-label text-small">선택된 친구</span>
+            <div class="cw-selected-friend-list" id="cw-invite-selected" aria-live="polite"></div>
+          </div>
+          <div class="cw-invite-list" id="cw-invitable-friends" aria-label="초대할 친구 선택"></div>
           <div class="cw-dialog-actions">
             <button type="button" class="btn" data-close-dialog>취소</button>
             <button type="submit" class="btn btn-primary" id="cw-invite-submit" disabled>초대</button>

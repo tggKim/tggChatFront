@@ -56,6 +56,7 @@ const state = {
   hasOlderMessages: false,
   loadingOlderMessages: false,
   hasConnected: false,
+  authenticationInitializing: true,
   authenticationFailureHandled: false,
   sessionInvalidated: false
 };
@@ -89,6 +90,16 @@ const dom = {
   messageDialogConfirm: $("#cw-message-dialog-confirm")
 };
 
+const friendSearch = {
+  active: false,
+  version: 0,
+  results: [],
+  status: "이름을 입력하고 검색해 주세요.",
+  pendingIds: new Set(),
+  addedIds: new Set(),
+  refreshTask: null
+};
+
 const sidebarViews = {
   friends: dom.friendList,
   chats: dom.chatList,
@@ -113,6 +124,11 @@ const createElement = (tag, className, text) => {
 };
 
 const toNumber = (value) => value == null ? null : Number(value);
+
+const formatUserTag = (userTag) => {
+  const value = String(userTag ?? "");
+  return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
+};
 
 const profileImageUrl = (profileImageKey, variant) =>
   `${getApiBaseUrl()}/profile-images/${encodeURIComponent(profileImageKey)}/${variant}`;
@@ -380,9 +396,15 @@ const renderFriendList = () => {
   state.friends.forEach((friend) => {
     const row = createElement("button", "cw-friend-row");
     row.type = "button";
+    const copy = createElement("span", "cw-friend-search-copy");
+    const formattedUserTag = formatUserTag(friend.userTag);
+    copy.append(createElement("span", "", friend.friendUsername));
+    if (formattedUserTag) {
+      copy.append(createElement("span", "cw-friend-search-email", formattedUserTag));
+    }
     row.append(
       createAvatar(friend.friendUsername, friend.profileImageKey),
-      createElement("span", "", friend.friendUsername),
+      copy,
       createElement("span")
     );
     row.addEventListener("click", () => openUserProfile(friend));
@@ -394,6 +416,9 @@ const renderCurrentUser = () => {
   if (!state.me) return;
   setAvatar($("#cw-my-avatar"), state.me.username, state.me.profileImageKey);
   $("#cw-my-name").textContent = state.me.username;
+  const userTag = $("#cw-my-user-tag");
+  userTag.textContent = formatUserTag(state.me.userTag);
+  userTag.hidden = !state.me.userTag;
 };
 
 const renderRoomHeader = () => {
@@ -1024,6 +1049,9 @@ const openOriginalProfileImage = (profileImageKey, username) => {
 };
 
 const closeDialogs = () => {
+  const shouldRefreshFriends = friendSearch.active;
+  friendSearch.active = false;
+  friendSearch.version += 1;
   const shouldRefreshMembers = state.refreshMembersOnProfileClose
     && !$("#cw-friend-profile-dialog").hidden
     && !dom.detailPanel.hidden;
@@ -1039,6 +1067,27 @@ const closeDialogs = () => {
   $("#cw-name-button").setAttribute("aria-expanded", "false");
 
   if (shouldRefreshMembers) openDetails();
+  if (shouldRefreshFriends && !state.sessionInvalidated && !state.authenticationFailureHandled) {
+    refreshSearchFriends().catch(handleError);
+  }
+};
+
+const dismissDialog = () => {
+  const user = state.selectedProfileUser;
+  if (friendSearch.active && user?.fromFriendSearch && !$("#cw-friend-profile-dialog").hidden) {
+    $("#cw-friend-profile-dialog").hidden = true;
+    closeOriginalProfileImage();
+    state.selectedProfileUser = null;
+    $("#cw-friend-add-dialog").hidden = false;
+    renderFriendSearchResults();
+    const previousUser = $$(".cw-friend-search-user")
+      .find((button) => Number(button.dataset.userId) === user.userId);
+    (previousUser || $("#cw-friend-username")).focus();
+    return;
+  }
+  const wasFriendSearch = friendSearch.active;
+  closeDialogs();
+  if (wasFriendSearch && !dom.addFriendButton.hidden) dom.addFriendButton.focus();
 };
 
 const setSubmitting = (form, submitting) => {
@@ -1138,9 +1187,147 @@ const loadFriends = async () => {
   state.friends = (await api.getFriends()).map((friend) => ({
     friendId: toNumber(friend.friendId),
     friendUsername: friend.friendUsername,
+    userTag: friend.userTag ?? null,
     profileImageKey: friend.profileImageKey ?? null
   }));
   renderFriendList();
+};
+
+// Serialize search-related refreshes so closing during an add cannot leave an older list.
+const refreshSearchFriends = async () => {
+  const task = (friendSearch.refreshTask || Promise.resolve()).catch(() => {}).then(loadFriends);
+  friendSearch.refreshTask = task;
+  try {
+    await task;
+  } finally {
+    if (friendSearch.refreshTask === task) friendSearch.refreshTask = null;
+  }
+};
+
+const setFriendSearchFeedback = (message = "") => {
+  const feedback = $("#cw-friend-search-feedback");
+  feedback.textContent = message;
+  feedback.hidden = !message;
+};
+
+const renderFriendSearchResults = () => {
+  const container = $("#cw-friend-search-results");
+  container.replaceChildren();
+  const candidates = friendSearch.results.filter((user) => !friendSearch.addedIds.has(user.userId));
+  if (!candidates.length) {
+    container.append(createElement("div", "cw-list-state", friendSearch.status || "추가할 수 있는 사용자가 없습니다."));
+    return;
+  }
+  candidates.forEach((user) => {
+    const row = createElement("div", "cw-friend-search-result");
+    const profile = createElement("button", "cw-friend-search-user");
+    profile.type = "button";
+    profile.dataset.userId = String(user.userId);
+    const formattedUserTag = formatUserTag(user.userTag);
+    profile.setAttribute("aria-label", `${user.username}${formattedUserTag ? `, ${formattedUserTag}` : ""} 상세 보기`);
+    const copy = createElement("span", "cw-friend-search-copy");
+    copy.append(createElement("span", "", user.username));
+    if (formattedUserTag) {
+      copy.append(createElement("span", "cw-friend-search-email", formattedUserTag));
+    }
+    profile.append(createAvatar(user.username, user.profileImageKey), copy);
+    profile.addEventListener("click", () => openUserProfile(user, { fromFriendSearch: true }));
+
+    const pending = friendSearch.pendingIds.has(user.userId);
+    const add = createElement("button", "btn btn-ghost cw-icon-button");
+    add.type = "button";
+    add.disabled = pending;
+    add.setAttribute("aria-label", `${user.username}${formattedUserTag ? `, ${formattedUserTag}` : ""} ${pending ? "친구 추가 중" : "친구 추가"}`);
+    add.setAttribute("aria-busy", String(pending));
+    add.dataset.tooltip = pending ? "추가 중…" : "친구 추가";
+    add.append(createIcon("user-plus"));
+    add.addEventListener("click", () => addSearchFriend(user));
+    row.append(profile, add);
+    container.append(row);
+  });
+};
+
+const openFriendSearch = () => {
+  closeDialogs();
+  friendSearch.active = true;
+  friendSearch.results = [];
+  friendSearch.status = "이름을 입력하고 검색해 주세요.";
+  $("#cw-friend-add-form").reset();
+  $("#cw-friend-search-results").setAttribute("aria-busy", "false");
+  setFriendSearchFeedback();
+  renderFriendSearchResults();
+  $("#cw-friend-add-dialog").hidden = false;
+  $("#cw-friend-username").focus();
+};
+
+const searchFriends = async () => {
+  const username = $("#cw-friend-username").value.trim();
+  const version = ++friendSearch.version;
+  friendSearch.results = [];
+  setFriendSearchFeedback();
+  if (!username || username.length > 50) {
+    friendSearch.status = "검색할 이름이 필요하며, 50자 이하여야 합니다.";
+    $("#cw-friend-search-results").setAttribute("aria-busy", "false");
+    renderFriendSearchResults();
+    return;
+  }
+  friendSearch.status = "검색 중입니다.";
+  $("#cw-friend-search-results").setAttribute("aria-busy", "true");
+  renderFriendSearchResults();
+  try {
+    const users = await api.searchFriends(username);
+    if (!friendSearch.active || version !== friendSearch.version) return;
+    friendSearch.results = users.map((user) => ({ ...user, userId: toNumber(user.userId) }));
+    friendSearch.status = "추가할 수 있는 사용자가 없습니다.";
+  } catch (error) {
+    if (!friendSearch.active || version !== friendSearch.version) return;
+    friendSearch.status = error?.message || "친구 검색에 실패했습니다. 다시 검색해 주세요.";
+    if (isAuthenticationError(error)) handleError(error);
+  } finally {
+    if (friendSearch.active && version === friendSearch.version) {
+      $("#cw-friend-search-results").setAttribute("aria-busy", "false");
+      renderFriendSearchResults();
+    }
+  }
+};
+
+const addSearchFriend = async (user) => {
+  const userId = toNumber(user.userId);
+  if (friendSearch.pendingIds.has(userId) || friendSearch.addedIds.has(userId)) return;
+  friendSearch.pendingIds.add(userId);
+  setFriendSearchFeedback();
+  renderFriendSearchResults();
+  if (state.selectedProfileUser?.fromFriendSearch) renderUserProfileAction();
+  try {
+    try {
+      await api.addFriendById(userId);
+    } catch (error) {
+      if (error?.code === "F001") friendSearch.addedIds.add(userId);
+      handleError(error);
+      return;
+    }
+    friendSearch.addedIds.add(userId);
+    if (friendSearch.active) {
+      if (user.fromFriendSearch && state.selectedProfileUser === user) {
+        dismissDialog();
+      } else {
+        renderFriendSearchResults();
+      }
+    }
+    try {
+      await refreshSearchFriends();
+    } catch (error) {
+      if (isAuthenticationError(error) || error?.name === "AbortError") {
+        handleError(error);
+      } else {
+        showMessage("친구는 추가되었지만 목록을 새로 불러오지 못했습니다. 친구 탭에서 다시 확인해 주세요.");
+      }
+    }
+  } finally {
+    friendSearch.pendingIds.delete(userId);
+    if (friendSearch.active) renderFriendSearchResults();
+    if (state.selectedProfileUser?.fromFriendSearch) renderUserProfileAction();
+  }
 };
 
 const resolvePendingRoomOpen = (roomId) => {
@@ -1677,15 +1864,56 @@ const renderSelectableFriends = (container, friends, checkboxClass) => {
   friends.forEach((friend) => {
     const label = createElement("label", "cw-invite-row");
     const checkbox = createElement("input", `form-check-input ${checkboxClass}`);
+    const username = friend.username ?? friend.friendUsername;
+    const formattedUserTag = formatUserTag(friend.userTag);
+    const copy = createElement("span", "cw-friend-search-copy");
+    copy.append(createElement("span", "", username));
+    if (formattedUserTag) {
+      copy.append(createElement("span", "cw-friend-search-email", formattedUserTag));
+    }
     checkbox.type = "checkbox";
     checkbox.value = String(friend.userId ?? friend.friendId);
+    label.dataset.username = username;
+    label.dataset.userTag = formattedUserTag;
     label.append(
-      createAvatar(friend.username ?? friend.friendUsername, friend.profileImageKey),
-      createElement("span", "", friend.username ?? friend.friendUsername),
+      createAvatar(username, friend.profileImageKey),
+      copy,
       checkbox
     );
     container.append(label);
   });
+};
+
+const renderSelectedFriends = (container, friendsContainer) => {
+  const selectedRows = [...friendsContainer.querySelectorAll(".cw-invite-row")]
+    .filter((row) => row.querySelector("input[type=checkbox]")?.checked);
+
+  container.replaceChildren();
+  container.parentElement.hidden = selectedRows.length === 0;
+  selectedRows.forEach((row) => {
+    const selectedFriend = createElement("span", "cw-selected-friend");
+    selectedFriend.append(createElement("span", "", row.dataset.username));
+    if (row.dataset.userTag) {
+      selectedFriend.append(createElement("span", "cw-selected-friend-tag", row.dataset.userTag));
+    }
+    container.append(selectedFriend);
+  });
+};
+
+const filterSelectableFriends = (container, username) => {
+  container.querySelector(".cw-selectable-search-empty")?.remove();
+  const query = username.trim();
+  let visibleCount = 0;
+
+  container.querySelectorAll(".cw-invite-row").forEach((row) => {
+    const matches = !query || row.dataset.username === query;
+    row.hidden = !matches;
+    if (matches) visibleCount += 1;
+  });
+
+  if (query && visibleCount === 0 && container.querySelector(".cw-invite-row")) {
+    container.append(createElement("div", "cw-list-state cw-selectable-search-empty", "이름이 일치하는 친구가 없습니다."));
+  }
 };
 
 const findFriendByUserId = (userId) =>
@@ -1697,19 +1925,31 @@ const renderUserProfileAction = () => {
   if (!user) return;
 
   actionButton.hidden = user.userId == null || user.userId === state.me?.userId;
-  actionButton.textContent = findFriendByUserId(user.userId) ? "채팅하기" : "친구 추가";
+  const isFriend = findFriendByUserId(user.userId)
+    || (user.fromFriendSearch && friendSearch.addedIds.has(user.userId));
+  actionButton.textContent = isFriend ? "채팅하기" : "친구 추가";
+  if (user.fromFriendSearch) {
+    actionButton.disabled = friendSearch.pendingIds.has(user.userId);
+    if (actionButton.disabled) actionButton.textContent = "추가 중…";
+  }
 };
 
-const openUserProfile = (user) => {
+const openUserProfile = (user, { fromFriendSearch = false } = {}) => {
   const userId = toNumber(user.userId ?? user.friendId);
 
-  closeDialogs();
+  if (fromFriendSearch) {
+    $("#cw-friend-add-dialog").hidden = true;
+  } else {
+    closeDialogs();
+  }
   state.refreshMembersOnProfileClose = false;
   const friend = findFriendByUserId(userId);
   state.selectedProfileUser = {
     userId,
     username: friend?.friendUsername ?? user.username ?? user.friendUsername ?? "알 수 없는 사용자",
-    profileImageKey: friend?.profileImageKey ?? user.profileImageKey ?? null
+    userTag: friend?.userTag ?? user.userTag ?? null,
+    profileImageKey: friend?.profileImageKey ?? user.profileImageKey ?? null,
+    fromFriendSearch
   };
 
   setAvatar(
@@ -1718,17 +1958,23 @@ const openUserProfile = (user) => {
     state.selectedProfileUser.profileImageKey
   );
   $("#cw-friend-profile-name").textContent = state.selectedProfileUser.username;
+  const userTag = $("#cw-friend-profile-email");
+  userTag.textContent = formatUserTag(state.selectedProfileUser.userTag);
+  userTag.hidden = !state.selectedProfileUser.userTag;
+  $("#cw-friend-profile-chat").disabled = false;
   renderUserProfileAction();
   $("#cw-friend-profile-dialog").hidden = false;
 };
 
 const openNewChatDialog = () => {
   closeDialogs();
+  $("#cw-new-chat-search").value = "";
   renderSelectableFriends(
     $("#cw-new-chat-friends"),
     state.friends,
     "cw-new-chat-check"
   );
+  renderSelectedFriends($("#cw-new-chat-selected"), $("#cw-new-chat-friends"));
   $("#cw-group-name").value = "";
   $("#cw-group-name-field").hidden = true;
   $("#cw-new-chat-submit").disabled = true;
@@ -1738,12 +1984,16 @@ const openNewChatDialog = () => {
 const openInviteDialog = async () => {
   if (!state.selectedRoomId) return;
   closeDialogs();
+  $("#cw-invite-search").value = "";
   $("#cw-invite-dialog").hidden = false;
   $("#cw-invitable-friends").replaceChildren(createElement("div", "cw-list-state", "초대 가능한 친구를 불러오는 중입니다."));
+  renderSelectedFriends($("#cw-invite-selected"), $("#cw-invitable-friends"));
 
   try {
     const friends = await api.getInvitableFriends(state.selectedRoomId);
     renderSelectableFriends($("#cw-invitable-friends"), friends, "cw-invite-check");
+    filterSelectableFriends($("#cw-invitable-friends"), $("#cw-invite-search").value);
+    renderSelectedFriends($("#cw-invite-selected"), $("#cw-invitable-friends"));
     $("#cw-invite-submit").disabled = true;
   } catch (error) {
     closeDialogs();
@@ -1755,6 +2005,25 @@ const renderMembers = () => {
   dom.memberList.replaceChildren();
   state.members.forEach((member) => {
     const row = createElement("div", "cw-member-row");
+    const profile = createElement("button", "cw-member-profile");
+    profile.type = "button";
+    const formattedUserTag = formatUserTag(member.userTag);
+    const isMe = toNumber(member.userId) === state.me?.userId;
+    profile.setAttribute("aria-label", `${member.username}${isMe ? ", 나" : ""}${formattedUserTag ? `, ${formattedUserTag}` : ""} 상세 보기`);
+    const copy = createElement("span", "cw-friend-search-copy");
+    const name = createElement("span", "cw-member-name-line");
+    if (isMe) name.append(createElement("span", "cw-member-self-badge", "나"));
+    name.append(createElement("span", "cw-member-name", member.username));
+    copy.append(name);
+    if (formattedUserTag) {
+      copy.append(createElement("span", "cw-friend-search-email", formattedUserTag));
+    }
+    profile.append(
+      createAvatar(member.username, member.profileImageKey),
+      copy,
+      createElement("span", "cw-member-role text-small text-muted", member.chatRoomUserRole)
+    );
+    profile.addEventListener("click", () => openUserProfile(member));
     const friendAction = createElement("span", "cw-member-friend-action");
     if (member.canAddFriend) {
       const addFriendButton = createElement("button", "btn btn-ghost cw-icon-button");
@@ -1766,7 +2035,7 @@ const renderMembers = () => {
       addFriendButton.addEventListener("click", async () => {
         addFriendButton.disabled = true;
         try {
-          await api.addFriend(member.username);
+          await api.addFriendById(member.userId);
           await loadFriends();
           member.canAddFriend = false;
           renderMembers();
@@ -1777,12 +2046,7 @@ const renderMembers = () => {
       });
       friendAction.append(addFriendButton);
     }
-    row.append(
-      createProfileAvatarButton(member),
-      createElement("span", "cw-member-name", member.username),
-      friendAction,
-      createElement("span", "cw-member-role text-small text-muted", member.chatRoomUserRole)
-    );
+    row.append(profile, friendAction);
     dom.memberList.append(row);
   });
   dom.detailTitle.textContent = `참여자 ${state.members.length}명`;
@@ -1910,7 +2174,7 @@ const bindEvents = () => {
   });
 
   window.addEventListener("pageshow", (event) => {
-    if (!getAccessToken() && (event.persisted || !state.authenticationFailureHandled)) {
+    if (!state.authenticationInitializing && !getAccessToken() && (event.persisted || !state.authenticationFailureHandled)) {
       showLoginRequired();
     }
   });
@@ -1954,13 +2218,8 @@ const bindEvents = () => {
     }
   }));
   dom.newChatButton.addEventListener("click", openNewChatDialog);
-  dom.addFriendButton.addEventListener("click", () => {
-    closeDialogs();
-    $("#cw-friend-add-form").reset();
-    $("#cw-friend-add-dialog").hidden = false;
-    $("#cw-friend-username").focus();
-  });
-  $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", closeDialogs));
+  dom.addFriendButton.addEventListener("click", openFriendSearch);
+  $$("[data-close-dialog]").forEach((button) => button.addEventListener("click", dismissDialog));
   $("[data-close-profile-image]").addEventListener("click", closeOriginalProfileImage);
   $("#cw-message-media-close").addEventListener("click", closeMessageMediaViewer);
   $("#cw-message-media-previous").addEventListener("click", () => moveMessageMediaViewer(-1));
@@ -1972,7 +2231,7 @@ const bindEvents = () => {
       || backdrop.id === "cw-message-media-dialog"
     ) return;
     backdrop.addEventListener("click", (event) => {
-      if (event.target === backdrop) closeDialogs();
+      if (event.target === backdrop) dismissDialog();
     });
   });
   $("#cw-profile-image-dialog").addEventListener("click", (event) => {
@@ -1983,26 +2242,20 @@ const bindEvents = () => {
   });
   dom.messageDialogConfirm.addEventListener("click", closeMessage);
 
-  $("#cw-friend-add-form").addEventListener("submit", async (event) => {
+  $("#cw-friend-add-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const username = $("#cw-friend-username").value.trim();
-    if (!username) return;
-    setSubmitting(form, true);
-    try {
-      await api.addFriend(username);
-      await loadFriends();
-      closeDialogs();
-      showMessage("친구를 추가했습니다.");
-    } catch (error) {
-      handleError(error);
-    } finally {
-      setSubmitting(form, false);
-    }
+    searchFriends();
   });
 
+  $("#cw-new-chat-search").addEventListener("input", (event) => {
+    filterSelectableFriends($("#cw-new-chat-friends"), event.currentTarget.value);
+  });
+  $("#cw-new-chat-search").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") event.preventDefault();
+  });
   $("#cw-new-chat-friends").addEventListener("change", () => {
     const count = $$(".cw-new-chat-check:checked").length;
+    renderSelectedFriends($("#cw-new-chat-selected"), $("#cw-new-chat-friends"));
     $("#cw-new-chat-submit").disabled = count === 0;
     $("#cw-group-name-field").hidden = count === 0;
   });
@@ -2027,14 +2280,19 @@ const bindEvents = () => {
     const user = state.selectedProfileUser;
     if (!user) return;
 
+    if (user.fromFriendSearch && !findFriendByUserId(user.userId) && !friendSearch.addedIds.has(user.userId)) {
+      await addSearchFriend(user);
+      return;
+    }
+
     const actionButton = event.currentTarget;
     actionButton.disabled = true;
     try {
-      if (findFriendByUserId(user.userId)) {
+      if (findFriendByUserId(user.userId) || (user.fromFriendSearch && friendSearch.addedIds.has(user.userId))) {
         const result = await api.createDirectRoom(user.userId);
         await openCreatedRoom(result.chatRoomId);
       } else {
-        await api.addFriend(user.username);
+        await api.addFriendById(user.userId);
         await loadFriends();
         state.refreshMembersOnProfileClose = true;
         renderUserProfileAction();
@@ -2047,7 +2305,14 @@ const bindEvents = () => {
   });
 
   $("#cw-invite-button").addEventListener("click", openInviteDialog);
+  $("#cw-invite-search").addEventListener("input", (event) => {
+    filterSelectableFriends($("#cw-invitable-friends"), event.currentTarget.value);
+  });
+  $("#cw-invite-search").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") event.preventDefault();
+  });
   $("#cw-invitable-friends").addEventListener("change", () => {
+    renderSelectedFriends($("#cw-invite-selected"), $("#cw-invitable-friends"));
     $("#cw-invite-submit").disabled = !$(".cw-invite-check:checked");
   });
   $("#cw-invite-form").addEventListener("submit", async (event) => {
@@ -2245,7 +2510,11 @@ const bindEvents = () => {
       closeOriginalProfileImage();
       return;
     }
-    closeDialogs();
+    if (friendSearch.active && !dom.messageDialog.hidden) {
+      closeMessage();
+      return;
+    }
+    dismissDialog();
   });
 };
 
@@ -2256,18 +2525,19 @@ const bootstrap = async () => {
     $("#cw-room-close").dataset.tooltip = "채팅방 목록으로 돌아가기";
   }
 
-  if (!getAccessToken()) {
-    showLoginRequired();
-    return;
-  }
-
   try {
+    if (!getAccessToken()) {
+      await refreshAccessToken();
+    }
+
     state.me = await api.getMe();
     state.me.userId = toNumber(state.me.userId);
     renderCurrentUser();
     socket.connect();
   } catch (error) {
     handleError(error);
+  } finally {
+    state.authenticationInitializing = false;
   }
 };
 

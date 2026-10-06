@@ -188,7 +188,9 @@ export const api = {
   logout: () => request("/logout", { method: "POST" }),
 
   getFriends: () => request("/friends"),
-  addFriend: (username) => request("/friends", { method: "POST", body: { username } }),
+
+  searchFriends: (username) => request(`/friends/search?${new URLSearchParams({ username })}`),
+  addFriendById: (userId) => request("/friends", { method: "POST", body: { userId } }),
 
   getChatRooms: () => request("/chatRooms"),
   createDirectRoom: (friendId) => request("/directChatRooms", {

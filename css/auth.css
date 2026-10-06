@@ -136,6 +136,22 @@ input:focus-visible {
   margin-top: 4px;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
 .btn {
   min-height: 40px;
   display: inline-flex;
@@ -168,6 +184,18 @@ input:focus-visible {
 .btn-primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--primary) 88%, var(--background));
   color: var(--primary-foreground);
+}
+
+.btn-google {
+  gap: 10px;
+  font-weight: 500;
+}
+
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
 }
 
 .dialog-backdrop {

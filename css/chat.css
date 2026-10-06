@@ -1017,13 +1017,48 @@
       gap: 4px;
     }
 
-    #chat-layout-wireframe .cw-member-row {
+    #chat-layout-wireframe .cw-member-row,
+    #chat-layout-wireframe .cw-member-profile {
       display: grid;
       grid-template-columns: 34px minmax(0, 1fr) 38px 56px;
       align-items: center;
       gap: 8px;
-      padding: 8px 0;
+    }
+
+    #chat-layout-wireframe .cw-member-row {
       border-bottom: 1px solid var(--border);
+    }
+
+    #chat-layout-wireframe .cw-member-profile {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      width: 100%;
+      min-width: 0;
+      padding: 8px 0;
+      border: 0;
+      background: transparent;
+      color: var(--foreground);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    #chat-layout-wireframe .cw-member-name-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    #chat-layout-wireframe .cw-member-self-badge {
+      flex: 0 0 auto;
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--secondary);
+      color: var(--muted-foreground);
+      font-size: 10px;
+      line-height: 1.4;
     }
 
     #chat-layout-wireframe .cw-member-name {
@@ -1034,12 +1069,16 @@
     }
 
     #chat-layout-wireframe .cw-member-friend-action {
+      grid-column: 3;
+      grid-row: 1;
+      z-index: 1;
       display: flex;
       width: 38px;
       justify-content: center;
     }
 
     #chat-layout-wireframe .cw-member-role {
+      grid-column: 4;
       width: 56px;
       text-align: right;
       white-space: nowrap;
@@ -1073,6 +1112,73 @@
       line-height: 1.55;
     }
 
+    #chat-layout-wireframe .cw-friend-search-dialog {
+      width: min(460px, 100%);
+      max-height: calc(100dvh - 36px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #chat-layout-wireframe .cw-friend-search-results {
+      min-height: 0;
+      max-height: 350px;
+      overflow-y: auto;
+      margin-top: 14px;
+    }
+
+    #chat-layout-wireframe .cw-friend-search-result {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #chat-layout-wireframe .cw-friend-search-user {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      padding: 4px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--foreground);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    #chat-layout-wireframe .cw-friend-search-user:hover {
+      background: var(--secondary);
+    }
+
+    #chat-layout-wireframe .cw-friend-search-copy {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+      overflow-wrap: anywhere;
+    }
+
+    #chat-layout-wireframe .cw-friend-search-email,
+    #chat-layout-wireframe .cw-search-profile-email,
+    #chat-layout-wireframe .cw-friend-search-feedback {
+      color: var(--muted-foreground);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    #chat-layout-wireframe .cw-friend-search-feedback {
+      margin: 12px 0 0;
+    }
+
+    #chat-layout-wireframe .cw-search-profile-email {
+      max-width: 100%;
+      text-align: center;
+    }
+
     #chat-layout-wireframe .cw-field {
       margin-top: 14px;
     }
@@ -1082,6 +1188,33 @@
       justify-content: flex-end;
       gap: 8px;
       margin-top: 14px;
+    }
+
+    #chat-layout-wireframe .cw-selected-friends {
+      margin-top: 12px;
+    }
+
+    #chat-layout-wireframe .cw-selected-friend-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    #chat-layout-wireframe .cw-selected-friend {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      max-width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--secondary);
+      font-size: 12px;
+    }
+
+    #chat-layout-wireframe .cw-selected-friend-tag {
+      color: var(--muted-foreground);
     }
 
     #chat-layout-wireframe .cw-invite-list {
