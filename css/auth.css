@@ -186,16 +186,45 @@ input:focus-visible {
   color: var(--primary-foreground);
 }
 
-.btn-google {
+.btn-google,
+.btn-kakao {
   gap: 10px;
   font-weight: 500;
 }
 
+.btn-kakao {
+  border-color: #fee500;
+  background: #fee500;
+  color: rgb(0 0 0 / 85%);
+}
 
-.google-icon {
+.btn-google:hover:not(:disabled) {
+  border-color: #c7d2fe;
+  background: #f1f5ff;
+  color: var(--card-foreground);
+}
+
+.btn-kakao:hover:not(:disabled) {
+  border-color: #f5dc00;
+  background: #f5dc00;
+  color: rgb(0 0 0 / 85%);
+}
+
+#show-signup:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.google-icon,
+.kakao-icon {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
+}
+
+.kakao-icon {
+  fill: currentColor;
 }
 
 .dialog-backdrop {

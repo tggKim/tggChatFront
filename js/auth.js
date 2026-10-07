@@ -11,6 +11,7 @@
   const showSignupButton = document.getElementById("show-signup");
   const showLoginButton = document.getElementById("show-login");
   const googleLoginButton = document.getElementById("google-login");
+  const kakaoLoginButton = document.getElementById("kakao-login");
   const loginSubmitButton = document.getElementById("login-submit");
   const signupSubmitButton = document.getElementById("signup-submit");
   const errorDialog = document.getElementById("error-dialog");
@@ -109,6 +110,10 @@
 
   googleLoginButton.addEventListener("click", () => {
     window.location.assign(`${API_BASE_URL}/oauth2/authorization/google`);
+  });
+
+  kakaoLoginButton.addEventListener("click", () => {
+    window.location.assign(`${API_BASE_URL}/oauth2/authorization/kakao`);
   });
 
   loginForm.addEventListener("submit", async (event) => {
