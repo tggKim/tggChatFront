@@ -2528,6 +2528,9 @@ const bootstrap = async () => {
   try {
     if (!getAccessToken()) {
       await refreshAccessToken();
+
+      const loginEventId = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      localStorage.setItem(LOGIN_EVENT_KEY, loginEventId);
     }
 
     state.me = await api.getMe();
