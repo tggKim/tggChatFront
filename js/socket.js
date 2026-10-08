@@ -1,4 +1,12 @@
-import { ensureAccessToken, getApiBaseUrl } from "./api.js";
+import {
+  ensureAccessToken,
+  getAccessToken,
+  getApiBaseUrl,
+  refreshAccessToken
+} from "./api.js";
+
+const MAX_INITIAL_RECONNECT_ATTEMPTS = 5;
+const MAX_INITIAL_CONNECTION_ATTEMPTS = MAX_INITIAL_RECONNECT_ATTEMPTS + 1;
 
 export class ChatSocket {
   constructor({ onConnected, onListEvent, onRoomEvent, onUserMetadataEvent, onError, onAuthFailure }) {
@@ -6,6 +14,8 @@ export class ChatSocket {
     this.client = null;
     this.roomSubscription = null;
     this.desiredRoomId = null;
+    this.hasConnectedOnce = false;
+    this.initialConnectionAttemptCount = 0;
   }
 
   connect() {
@@ -14,14 +24,24 @@ export class ChatSocket {
       return;
     }
 
+    this.hasConnectedOnce = false;
+    this.initialConnectionAttemptCount = 0;
+
     this.client = new window.StompJs.Client({
       webSocketFactory: () => new window.SockJS(`${getApiBaseUrl()}/ws`),
       reconnectDelay: 3000,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
       beforeConnect: async () => {
+        if (!this.hasConnectedOnce) {
+          this.initialConnectionAttemptCount += 1;
+        }
+
         try {
-          const token = await ensureAccessToken();
+          const currentToken = getAccessToken();
+          const token = currentToken
+            ? await ensureAccessToken()
+            : await refreshAccessToken();
           this.client.connectHeaders = { Authorization: `Bearer ${token}` };
         } catch (error) {
           this.callbacks.onAuthFailure(error);
@@ -29,6 +49,9 @@ export class ChatSocket {
         }
       },
       onConnect: () => {
+        this.hasConnectedOnce = true;
+        this.initialConnectionAttemptCount = 0;
+
         this.client.subscribe("/user/queue/errors", (frame) => {
           const error = this.parseFrame(frame);
           this.callbacks.onError(error || { message: "실시간 요청을 처리하지 못했습니다." });
@@ -48,6 +71,21 @@ export class ChatSocket {
         const body = this.parseFrame(frame);
         this.callbacks.onError(body || {
           message: frame.headers?.message || "실시간 연결 오류가 발생했습니다."
+        });
+      },
+      onWebSocketClose: () => {
+        if (
+          this.hasConnectedOnce
+          || !this.client?.active
+          || this.initialConnectionAttemptCount < MAX_INITIAL_CONNECTION_ATTEMPTS
+        ) {
+          return;
+        }
+
+        void this.client.deactivate();
+        this.callbacks.onError({
+          message: "실시간 연결에 실패했습니다. 페이지를 새로고침해 주세요.",
+          transient: false
         });
       },
       onWebSocketError: () => {
